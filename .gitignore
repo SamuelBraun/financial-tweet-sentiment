@@ -1,0 +1,32 @@
+# Virtual Environment
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Distribution / Packaging
+dist/
+build/
+*.egg-info/
+
+# Environment variables
+.env
+
+# Claude
+.claude/
+
+# Data (local only, not tracked by git)
+data/
+
+# Model weights / outputs
+outputs/models/
+outputs/logs/
+
+# OS
+.DS_Store
