@@ -19,7 +19,7 @@ from src import RANDOM_STATE
 try:
     from xgboost import XGBClassifier
     HAS_XGBOOST = True
-except (ImportError, OSError, Exception):
+except Exception:
     HAS_XGBOOST = False
 
 
