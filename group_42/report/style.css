@@ -1,0 +1,162 @@
+@page {
+    size: A4;
+    margin: 2cm 2.5cm;
+    @bottom-center {
+        content: counter(page);
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 10pt;
+        color: #666;
+    }
+}
+
+body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    color: #1a1a1a;
+    max-width: none;
+}
+
+h1 {
+    font-size: 20pt;
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 5pt;
+    color: #1a1a1a;
+    page-break-before: avoid;
+}
+
+h1 + p {
+    text-align: center;
+    font-size: 13pt;
+    color: #444;
+    margin-bottom: 20pt;
+}
+
+h2 {
+    font-size: 15pt;
+    color: #2c3e50;
+    border-bottom: 1.5pt solid #2c3e50;
+    padding-bottom: 3pt;
+    margin-top: 24pt;
+    page-break-after: avoid;
+}
+
+h3 {
+    font-size: 13pt;
+    color: #34495e;
+    margin-top: 16pt;
+    page-break-after: avoid;
+}
+
+p {
+    text-align: justify;
+    margin-bottom: 8pt;
+    orphans: 3;
+    widows: 3;
+}
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 12pt 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+}
+
+th {
+    background-color: #2c3e50;
+    color: white;
+    padding: 6pt 8pt;
+    text-align: left;
+    font-weight: bold;
+}
+
+td {
+    padding: 5pt 8pt;
+    border-bottom: 0.5pt solid #ddd;
+}
+
+tr:nth-child(even) {
+    background-color: #f8f9fa;
+}
+
+tr:hover {
+    background-color: #eef2f7;
+}
+
+code {
+    background-color: #f4f4f4;
+    padding: 1pt 4pt;
+    border-radius: 3pt;
+    font-family: 'Courier New', monospace;
+    font-size: 10pt;
+}
+
+strong {
+    color: #2c3e50;
+}
+
+em {
+    color: #555;
+}
+
+ul, ol {
+    margin-bottom: 8pt;
+    padding-left: 20pt;
+}
+
+li {
+    margin-bottom: 4pt;
+}
+
+hr {
+    border: none;
+    border-top: 1pt solid #ccc;
+    margin: 20pt 0;
+}
+
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 10pt auto;
+}
+
+.figure {
+    text-align: center;
+    margin: 14pt 0;
+    page-break-inside: avoid;
+}
+
+.figure img {
+    max-width: 90%;
+}
+
+.figure-caption {
+    font-size: 10pt;
+    color: #666;
+    margin-top: 4pt;
+    font-style: italic;
+}
+
+.two-col {
+    display: flex;
+    gap: 10pt;
+    page-break-inside: avoid;
+}
+
+.two-col .figure {
+    flex: 1;
+}
+
+.two-col .figure img {
+    max-width: 100%;
+}
+
+blockquote {
+    border-left: 3pt solid #2c3e50;
+    padding-left: 12pt;
+    color: #555;
+    margin: 10pt 0;
+}
