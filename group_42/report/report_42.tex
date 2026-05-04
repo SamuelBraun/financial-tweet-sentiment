@@ -436,11 +436,11 @@ Paired $t$-tests on 5-fold CV scores confirm that performance differences betwee
 This validates that our model ranking is not an artifact of random variation.
 
 % ══════════════════════════════════════════════════════════════════════════════
-\section{Extra Work}
+\section{EXTRA WORK}
 \label{sec:extra}
 % ══════════════════════════════════════════════════════════════════════════════
 
-\subsection{Domain-Specific Transformer Encoders}
+\subsection{EXTRA WORK --- Domain-Specific Transformer Encoders}
 
 We evaluate two additional pretrained encoders beyond the mandatory DistilBERT:
 
@@ -451,13 +451,28 @@ We evaluate two additional pretrained encoders beyond the mandatory DistilBERT:
     Achieves \textbf{0.794~macro-F1}, the best result overall.
 \end{itemize}
 
-\subsection{Agentic Workflow}
+\subsection{EXTRA WORK --- Agentic Workflow}
 
 We implement a LangChain-based agent (\texttt{src/agent.py}) with five tools: \textit{classify\_tweet}, \textit{route\_model} (intelligent routing based on tweet characteristics), \textit{ensemble\_classify} (majority-vote across all models), \textit{compare\_models}, and \textit{explain\_\allowbreak prediction} (coefficient-based feature attribution).
 
 The agent demonstrates non-trivial decision-making: it inspects tweet content to choose the most appropriate model (e.g., cashtags $\rightarrow$ FinBERT), reconciles model disagreements via ensemble voting, and provides human-interpretable explanations.
+Three example transcripts illustrate these capabilities:
 
-\subsection{Decoder Model (Attempted)}
+\textbf{Transcript~1 --- Model Routing.}
+Input: \textit{``\$AAPL just hit all-time high, massive breakout above resistance.''}
+The agent detects a \$TICKER cashtag and routes to FinBERT.
+Result: \textbf{Bullish} (89.1\% confidence). The routing decision demonstrates domain-aware model selection.
+
+\textbf{Transcript~2 --- Ensemble with Disagreement.}
+Input: \textit{``Markets mixed today as Fed signals possible rate changes amid inflation concerns.''}
+The agent runs all four models: TF-IDF/LogReg, FinBERT, and Twitter-RoBERTa predict Neutral; DistilBERT predicts Bearish.
+Result: \textbf{Neutral} (75\% agreement). DistilBERT's error illustrates why domain alignment matters --- it over-weights ``concerns'' and ``inflation'' without financial context.
+
+\textbf{Transcript~3 --- Feature Attribution.}
+Input: \textit{``Sell everything, this stock is going to crash hard.''}
+The agent uses TF-IDF + LogReg coefficients to explain: ``sell'' (+2.85) and ``crash'' (+2.63) are the strongest Bearish signals; both have strong negative coefficients for Bullish ($-$1.92, $-$2.10), actively pushing the prediction away from that class.
+
+\subsection{EXTRA WORK --- Decoder Model (Attempted)}
 
 We implemented few-shot classification using Flan-T5-small with 2~examples per class.
 CPU inference proved infeasible (${\sim}$2--5s per tweet $\times$ 2,388~tweets $>$ 3~hours), documented as a limitation.
