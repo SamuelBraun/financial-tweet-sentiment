@@ -120,12 +120,8 @@ class Word2VecFeaturizer(BaseEstimator, TransformerMixin):
         import gensim.downloader as api
 
         if self.mode == "glove":
-            cache = Path(self.cache_path).parent / "glove-twitter-100.model"
-            if cache.exists():
-                self.model = api.load("glove-twitter-100")
-            else:
-                print("Downloading GloVe Twitter embeddings (first time only)...")
-                self.model = api.load("glove-twitter-100")
+            print("Loading GloVe Twitter embeddings...")
+            self.model = api.load("glove-twitter-100")
             self.vector_size = self.model.vector_size
         else:
             cache = Path(self.cache_path)

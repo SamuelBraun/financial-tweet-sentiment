@@ -145,8 +145,8 @@ def cross_validate_model(model, X, y, n_folds: int = 5,
     all_preds = np.zeros_like(y)
 
     for fold_idx, (train_idx, val_idx) in enumerate(skf.split(X, y)):
-        X_train_fold = X[train_idx] if hasattr(X, '__getitem__') else X[train_idx]
-        X_val_fold = X[val_idx] if hasattr(X, '__getitem__') else X[val_idx]
+        X_train_fold = X[train_idx]
+        X_val_fold = X[val_idx]
         y_train_fold = y[train_idx]
         y_val_fold = y[val_idx]
 

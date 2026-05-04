@@ -75,7 +75,6 @@ def _xgboost(**kwargs):
         objective="multi:softprob",
         eval_metric="mlogloss",
         random_state=RANDOM_STATE,
-        use_label_encoder=False,
         n_jobs=-1,
     )
     defaults.update(kwargs)

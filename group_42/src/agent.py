@@ -88,12 +88,10 @@ class ClassificationTools:
             features = vectorizer.transform([processed])
         else:
             # Transformer embeddings — use cached or compute
-            from src.features import TransformerFeaturizer
             featurizer = pipeline.get("featurizer")
-            if featurizer:
-                features = featurizer.transform([processed])
-            else:
-                features = vectorizer.transform([processed])
+            if featurizer is None:
+                return {"error": f"Model '{model_name}' has no vectorizer or featurizer."}
+            features = featurizer.transform([processed])
 
         # Predict
         pred = model.predict(features)[0]
