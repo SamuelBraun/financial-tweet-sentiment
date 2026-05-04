@@ -1,4 +1,4 @@
-# Report Outline — Group XX
+# Report Outline — Group 42
 ## Financial Tweet Sentiment Classification
 
 **Target**: ≤ 15 pages, PDF format.

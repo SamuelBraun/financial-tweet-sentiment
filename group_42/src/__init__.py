@@ -1,5 +1,5 @@
 """
-Text Mining Group XX — Financial Tweet Sentiment Classification.
+Text Mining Group 42 — Financial Tweet Sentiment Classification.
 
 This package contains reusable modules imported by the experimentation
 and final pipeline notebooks.
@@ -8,10 +8,10 @@ and final pipeline notebooks.
 import os
 from pathlib import Path
 
-# Project root is the group_XX/ directory
+# Project root is the group_42/ directory
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-# Data directory — check inside group_XX first, fall back to repo root
+# Data directory — check inside group_42 first, fall back to repo root
 DATA_DIR = PROJECT_ROOT / "data"
 if not (DATA_DIR / "train.csv").exists():
     DATA_DIR = PROJECT_ROOT.parent / "data"

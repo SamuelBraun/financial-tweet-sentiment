@@ -1,4 +1,4 @@
-# Group XX — Financial Tweet Sentiment Classification
+# Group 42 — Financial Tweet Sentiment Classification
 
 **Course**: Text Mining, Spring 2025/2026 — NOVA IMS
 
@@ -21,10 +21,10 @@ Classify financial tweets into three sentiment classes:
 ## Repository Structure
 
 ```
-group_XX/
+group_42/
 ├── notebooks/
-│   ├── tm_tests_XX.ipynb    # Full experimentation notebook
-│   └── tm_final_XX.ipynb    # Final pipeline (runs end-to-end < 20 min)
+│   ├── tm_tests_42.ipynb    # Full experimentation notebook
+│   └── tm_final_42.ipynb    # Final pipeline (runs end-to-end < 20 min)
 ├── src/                     # Reusable modules
 │   ├── preprocessing.py     # Text cleaning & normalization
 │   ├── features.py          # Feature extraction (BoW, W2V, Transformers)
@@ -32,11 +32,11 @@ group_XX/
 │   ├── evaluation.py        # Metrics & visualization
 │   └── agent.py             # LangChain agentic workflow (extra credit)
 ├── outputs/
-│   └── pred_XX.csv          # Final test predictions
+│   └── pred_42.csv          # Final test predictions
 ├── figures/                 # Saved plots (300 dpi PNGs)
 ├── models/                  # Cached models & embeddings (gitignored)
 └── report/
-    └── report_XX.pdf        # Final report (≤ 15 pages)
+    └── report_42.pdf        # Final report (≤ 15 pages)
 ```
 
 ## Setup
@@ -64,14 +64,14 @@ python -c "import nltk; nltk.download('stopwords'); nltk.download('wordnet'); nl
 
 ### Experimentation notebook
 ```bash
-jupyter notebook notebooks/tm_tests_XX.ipynb
+jupyter notebook notebooks/tm_tests_42.ipynb
 ```
 
 ### Final pipeline (produces predictions)
 ```bash
-jupyter notebook notebooks/tm_final_XX.ipynb
+jupyter notebook notebooks/tm_final_42.ipynb
 # Run all cells — completes in < 20 minutes on CPU
-# Output: outputs/pred_XX.csv
+# Output: outputs/pred_42.csv
 ```
 
 ### Agentic workflow (extra credit)
@@ -85,4 +85,4 @@ python -m src.agent
 - **CPU-only**: All models are designed to run on CPU laptops
 - **Reproducibility**: `random_state=42` is used everywhere
 - **Cached embeddings**: Transformer embeddings are cached to `models/*.npy` — first run takes ~30 min, subsequent runs use cache
-- Replace `XX` with your group number before submission
+- Group number: 42
