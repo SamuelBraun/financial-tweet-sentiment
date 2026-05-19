@@ -1,0 +1,160 @@
+{
+  "averaging_problem": [
+    {
+      "s1": "stock is going up today",
+      "s2": "stock is going down today",
+      "cosine": 0.9961004257202148
+    },
+    {
+      "s1": "market crashed not recovered",
+      "s2": "market crashed not destroyed",
+      "cosine": 0.9653403162956238
+    },
+    {
+      "s1": "earnings beat expectations",
+      "s2": "earnings missed expectations",
+      "cosine": 0.9300345182418823
+    }
+  ],
+  "subword_demo": [
+    {
+      "term": "bullish",
+      "DistilBERT": [
+        "bull",
+        "##ish"
+      ],
+      "FinBERT": [
+        "bull",
+        "##ish"
+      ],
+      "Twitter-RoBERTa": [
+        "bull",
+        "ish"
+      ]
+    },
+    {
+      "term": "bearish",
+      "DistilBERT": [
+        "bear",
+        "##ish"
+      ],
+      "FinBERT": [
+        "bear",
+        "##ish"
+      ],
+      "Twitter-RoBERTa": [
+        "bear",
+        "ish"
+      ]
+    },
+    {
+      "term": "downgrade",
+      "DistilBERT": [
+        "down",
+        "##grade"
+      ],
+      "FinBERT": [
+        "down",
+        "##grade"
+      ],
+      "Twitter-RoBERTa": [
+        "down",
+        "grade"
+      ]
+    },
+    {
+      "term": "breakout",
+      "DistilBERT": [
+        "breakout"
+      ],
+      "FinBERT": [
+        "breakout"
+      ],
+      "Twitter-RoBERTa": [
+        "break",
+        "out"
+      ]
+    },
+    {
+      "term": "<TICKER>",
+      "DistilBERT": [
+        "<",
+        "tick",
+        "##er",
+        ">"
+      ],
+      "FinBERT": [
+        "<",
+        "tick",
+        "##er",
+        ">"
+      ],
+      "Twitter-RoBERTa": [
+        "<",
+        "T",
+        "ICK",
+        "ER",
+        ">"
+      ]
+    },
+    {
+      "term": "FOMC",
+      "DistilBERT": [
+        "f",
+        "##om",
+        "##c"
+      ],
+      "FinBERT": [
+        "f",
+        "##om",
+        "##c"
+      ],
+      "Twitter-RoBERTa": [
+        "F",
+        "OM",
+        "C"
+      ]
+    },
+    {
+      "term": "rebalancing",
+      "DistilBERT": [
+        "re",
+        "##bala",
+        "##nc",
+        "##ing"
+      ],
+      "FinBERT": [
+        "re",
+        "##bala",
+        "##nc",
+        "##ing"
+      ],
+      "Twitter-RoBERTa": [
+        "re",
+        "bal",
+        "ancing"
+      ]
+    },
+    {
+      "term": "shorting",
+      "DistilBERT": [
+        "short",
+        "##ing"
+      ],
+      "FinBERT": [
+        "short",
+        "##ing"
+      ],
+      "Twitter-RoBERTa": [
+        "short",
+        "ing"
+      ]
+    }
+  ],
+  "pca": {
+    "figure": "/Users/samuel/VSC/MSDAA-Text-Mining/group_42/figures/pca_twitter_roberta.png",
+    "variance_pc1": 0.2671147584915161,
+    "variance_pc2": 0.07422103732824326,
+    "n_val": 1909
+  }
+}
