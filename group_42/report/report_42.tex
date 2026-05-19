@@ -268,11 +268,11 @@ Twitter-RoBERTa & Twitter + sentiment & 125M & Extra work \\
 \end{tabular}
 \end{table}
 
-\textbf{Key finding}: Domain alignment is more important than model size.
-DistilBERT (general-purpose, 66M~params) underperforms TF-IDF, while Twitter-RoBERTa (tweet-domain, sentiment-tuned, 125M~params) achieves the best results overall.
-FinBERT falls between --- it understands financial language but was trained on formal SEC filings, not informal tweets.
+\begin{sloppypar}
+\textbf{Key finding}: domain alignment is more important than model size. DistilBERT (general-purpose, 66M~params) underperforms TF-IDF, while Twitter-RoBERTa (tweet-domain, sentiment-tuned, 125M~params) achieves the best results overall. FinBERT falls between --- it understands financial language but was trained on formal SEC filings, not informal tweets.
 
-\textbf{Tokenization note.} The three encoders use WordPiece (DistilBERT, FinBERT) or byte-pair (Twitter-RoBERTa) subword vocabularies, so most finance vocabulary is split: \texttt{bullish} $\rightarrow$ \texttt{bull|ish}, \texttt{downgrade} $\rightarrow$ \texttt{down|grade}, \texttt{rebalancing} $\rightarrow$ \texttt{re|bala|nc|ing} (DistilBERT/FinBERT) or \texttt{re|bal|ancing} (Twitter-RoBERTa). Our \texttt{<TICKER>} placeholder is fragmented (\texttt{<|tick|\#\#er|>} for BERT-family, \texttt{<|T|ICK|ER|>} for RoBERTa) --- the encoder loses the holistic ``ticker'' signal but still sees a consistent rare-token pattern across all cashtags, which is the property we wanted to preserve.
+\textbf{Tokenization note.} The three encoders use WordPiece (DistilBERT, FinBERT) or byte-pair (Twitter-RoBERTa) subword vocabularies, so most finance vocabulary is split: \texttt{bullish}~$\rightarrow$~\texttt{bull|ish}, \texttt{downgrade}~$\rightarrow$~\texttt{down|grade}, \texttt{rebalancing}~$\rightarrow$~\texttt{re|bala|nc|ing} (DistilBERT/FinBERT) or \texttt{re|bal|ancing} (Twitter-RoBERTa). Our \texttt{<TICKER>} placeholder is fragmented (\texttt{<|tick|\#\#er|>} for BERT-family, \texttt{<|T|ICK|ER|>} for RoBERTa) --- the encoder loses the holistic ``ticker'' signal but still sees a consistent rare-token pattern across all cashtags, which is the property we wanted to preserve.
+\end{sloppypar}
 
 \textbf{Pooling choice (CLS vs.\ mean).} The canonical sentence representation in BERT-family models is the \texttt{[CLS]} token. We use mean pooling over all token hidden states (with attention masking) and verified directly that this does not cost performance (Table~\ref{tab:pooling}). For the sentiment-tuned encoders the two choices are within noise; mean pooling slightly helps DistilBERT, whose \texttt{[CLS]} representation was not optimised for sentiment.
 
@@ -448,12 +448,12 @@ This validates that our model ranking is not an artifact of random variation.
 
 We evaluate two additional pretrained encoders beyond the mandatory DistilBERT:
 
+\begin{sloppypar}
 \begin{itemize}
-    \item \textbf{FinBERT} (\texttt{ProsusAI/finbert}): Trained on financial communications.
-    Achieves 0.779~macro-F1, a \textbf{7.4~pp improvement} over DistilBERT.
-    \item \textbf{Twitter-RoBERTa} (\texttt{cardiffnlp/twitter-roberta-base-sentiment\--latest}): Trained on 58M~tweets with sentiment labels.
-    Achieves \textbf{0.794~macro-F1}, the best result overall.
+    \item \textbf{FinBERT} (\texttt{ProsusAI/finbert}): trained on financial communications; achieves 0.779~macro-F1, a \textbf{7.4~pp improvement} over DistilBERT.
+    \item \textbf{Twitter-RoBERTa} (\texttt{cardiffnlp/twitter-roberta-base-sentiment-latest}): trained on 58M~tweets with sentiment labels; achieves \textbf{0.794~macro-F1}, the best result overall.
 \end{itemize}
+\end{sloppypar}
 
 \subsection{EXTRA WORK --- Zero-Shot Pretrained Classification}
 \label{sec:zero_shot}
@@ -485,12 +485,20 @@ Supervised adaptation on $\sim$9.5k labeled examples is what recovers the missin
 
 \subsection{EXTRA WORK --- Agentic Workflow}
 
-We implement a LangChain-based agent (\texttt{src/agent.py}) with five tools: \textit{classify\_tweet}, \textit{route\_model} (intelligent routing based on tweet characteristics), \textit{ensemble\_classify} (majority-vote across all models), \textit{compare\_models}, and \textit{explain\_\allowbreak prediction} (coefficient-based feature attribution).
+\begin{sloppypar}
+We implement a LangChain-based agent (\texttt{src/agent.py}) with five tools: \textit{classify\_tweet}, \textit{route\_model} (intelligent routing based on tweet characteristics), \textit{ensemble\_classify} (majority-vote across all models), \textit{compare\_models}, and \textit{explain\_prediction} (coefficient-based feature attribution).
+\end{sloppypar}
 
-The agent demonstrates non-trivial decision-making: inspecting tweet content to choose a model, reconciling model disagreements, and providing human-interpretable explanations. Three example transcripts (full logs in \texttt{outputs/agent\_transcripts.md}):
-\textbf{(1)~Routing.} \textit{``\$AAPL just hit all-time high, massive breakout above resistance.''} $\rightarrow$ \$TICKER detected $\rightarrow$ FinBERT $\rightarrow$ \textbf{Bullish} (89.1\% confidence).
-\textbf{(2)~Ensemble.} \textit{``Markets mixed today as Fed signals possible rate changes amid inflation concerns.''} $\rightarrow$ TF-IDF/LogReg + FinBERT + Twitter-RoBERTa vote Neutral, DistilBERT votes Bearish $\rightarrow$ \textbf{Neutral} (75\% agreement); DistilBERT over-weights ``concerns'' without financial context.
-\textbf{(3)~Attribution.} \textit{``Sell everything, this stock is going to crash hard.''} $\rightarrow$ LogReg coefficients explain: ``sell'' (+2.85) and ``crash'' (+2.63) are strongest Bearish signals; both have negative Bullish coefficients ($-$1.92, $-$2.10).
+The agent inspects tweet content to choose a model, reconciles disagreements, and provides interpretable explanations. Three example transcripts (full logs in \texttt{agent\_\allowbreak transcripts.md}):
+
+\textbf{Routing.}~Input: ``\$AAPL all-time high, breakout above resistance.''
+The agent detects \$TICKER, routes to FinBERT, returns \textbf{Bullish} (89.1\%).
+
+\textbf{Ensemble.}~Input: ``Markets mixed; Fed signals rate changes amid inflation concerns.''
+TF-IDF/LogReg, FinBERT and Twitter-RoBERTa vote Neutral; DistilBERT votes Bearish $\rightarrow$ \textbf{Neutral} (75\% agreement). DistilBERT over-weights ``concerns'' without financial context.
+
+\textbf{Attribution.}~Input: ``Sell everything, this stock is going to crash hard.''
+LogReg coefficients identify ``sell'' (+2.85) and ``crash'' (+2.63) as strongest Bearish signals; both have negative Bullish coefficients ($-$1.92, $-$2.10).
 
 \subsection{EXTRA WORK --- Decoder Model (Attempted)}
 
