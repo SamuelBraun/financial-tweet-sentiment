@@ -28,5 +28,8 @@ data/
 outputs/models/
 outputs/logs/
 
+# Course materials (local reference only — not part of submission)
+practicals/
+
 # OS
 .DS_Store
