@@ -451,6 +451,34 @@ We evaluate two additional pretrained encoders beyond the mandatory DistilBERT:
     Achieves \textbf{0.794~macro-F1}, the best result overall.
 \end{itemize}
 
+\subsection{EXTRA WORK --- Zero-Shot Pretrained Classification}
+\label{sec:zero_shot}
+
+To isolate the contribution of the trained downstream classifier from that of the pretrained encoder, we apply Twitter-RoBERTa's built-in 3-class sentiment head (negative/neutral/positive) directly to our validation set --- no training of our own.
+Outputs are mapped to our label space: negative\,$\rightarrow$\,Bearish, positive\,$\rightarrow$\,Bullish, neutral\,$\rightarrow$\,Neutral.
+
+The zero-shot baseline reaches \textbf{0.587~macro-F1} (5-fold aggregation: $0.587 \pm 0.012$), well below the 0.794 obtained when the same encoder is paired with a trained XGBoost classifier (Table~\ref{tab:zero_shot}).
+
+\begin{table}[H]
+\centering
+\caption{Same encoder, two heads: zero-shot vs.\ supervised adaptation.}
+\label{tab:zero_shot}
+\begin{tabular}{lr}
+\toprule
+\textbf{Approach (Twitter-RoBERTa encoder)} & \textbf{Macro-F1} \\
+\midrule
+Zero-shot (pretrained 3-class head, no training) & 0.587 \\
+Frozen embeddings + XGBoost (ours)               & \textbf{0.794} \\
+\midrule
+$\Delta$ from supervised adaptation              & \textbf{+0.207} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The gap concentrates in the minority classes --- Bearish/Bullish F1 fall from 0.65--0.75 (trained) to 0.48--0.49 (zero-shot), while Neutral degrades less.
+This reflects the misalignment between the model's pretraining objective (general Twitter sentiment) and the financial-sentiment label space: a tweet using ``downgrade'', ``cut'' or ``miss'' is bearish in finance but not unambiguously negative in everyday speech.
+Supervised adaptation on $\sim$9.5k labeled examples is what recovers the missing $+0.21$~macro-F1; pretraining domain alignment is necessary but not sufficient.
+
 \subsection{EXTRA WORK --- Agentic Workflow}
 
 We implement a LangChain-based agent (\texttt{src/agent.py}) with five tools: \textit{classify\_tweet}, \textit{route\_model} (intelligent routing based on tweet characteristics), \textit{ensemble\_classify} (majority-vote across all models), \textit{compare\_models}, and \textit{explain\_\allowbreak prediction} (coefficient-based feature attribution).
@@ -520,6 +548,7 @@ The winning pipeline --- Twitter-RoBERTa + XGBoost --- achieves \textbf{0.794~ma
 \begin{enumerate}
     \item \textbf{Domain alignment $>$ model sophistication}: DistilBERT (66M~params) underperforms TF-IDF bigrams; Twitter-RoBERTa (125M~params) exceeds both.
     \textit{What} a model was trained on matters more than \textit{how large} it is.
+    Alignment alone is not enough either --- the same encoder applied zero-shot scores 0.587 (Section~\ref{sec:zero_shot}); the trained head adds $+0.21$~macro-F1.
 
     \item \textbf{Feature extraction matters more than classifier choice}: The gap between feature families (0.60 for W2V vs.\ 0.79 for Twitter-RoBERTa) far exceeds the gap between classifiers within a family (0.02--0.05).
 

@@ -1,0 +1,29 @@
+{
+  "model": "cardiffnlp/twitter-roberta-base-sentiment-latest",
+  "approach": "zero-shot (pretrained head, no downstream classifier)",
+  "val_set": {
+    "n": 1909,
+    "macro_f1": 0.5765754475264782,
+    "accuracy": 0.6736511262441068
+  },
+  "full_set": {
+    "n": 9543,
+    "macro_f1_single": 0.5869410054247252,
+    "cv_mean": 0.5867405565842185,
+    "cv_std": 0.011462061631708077,
+    "fold_scores": [
+      0.5966040528556505,
+      0.5754981743736286,
+      0.5862485433141217,
+      0.6023597107417898,
+      0.5729923016359023
+    ]
+  },
+  "label_mapping": {
+    "negative": 0,
+    "neutral": 2,
+    "positive": 1
+  },
+  "n_folds": 5,
+  "random_state": 42
+}
