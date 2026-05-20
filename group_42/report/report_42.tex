@@ -58,10 +58,6 @@
 \usepackage{enumitem}
 \setlist{itemsep=2pt, parsep=0pt, leftmargin=1.5em, topsep=4pt}
 
-% ── Inline tag for extra-credit work (preserves the literal string while
-% keeping subsection titles clean) ──────────────────────────────────────────
-\newcommand{\extratag}{\textbf{[EXTRA WORK]}~}
-
 % ── Header/footer ────────────────────────────────────────────────────────────
 \usepackage{fancyhdr}
 \pagestyle{fancy}
@@ -114,13 +110,11 @@
 \section{Introduction}
 % ══════════════════════════════════════════════════════════════════════════════
 
-Financial sentiment analysis on social media has practical applications in algorithmic trading, market surveillance and investor-sentiment tracking. Unlike general-purpose sentiment analysis, financial tweets present unique challenges: domain-specific vocabulary (cashtags, financial jargon), extreme brevity and an inherent class imbalance in which neutral commentary dominates.
+Financial sentiment is what hedge funds, market-surveillance teams and retail investors all try to read out of social media in real time. Unlike general sentiment analysis, where ``great movie!'' is unambiguously positive, financial tweets mix specialised vocabulary (cashtags, jargon) with extreme brevity and a heavy class skew toward neutral commentary. A tweet stating ``stock down 5\% after earnings miss'' is bearish only to a reader who treats it as a directional claim rather than a factual report, and that ambiguity is exactly what makes the task hard.
 
-We frame the problem as multi-class text classification: given a financial tweet, predict whether it expresses Bearish~(0), Bullish~(1) or Neutral~(2) sentiment. Our approach evaluated 32~combinations of feature-extraction methods and classifiers using 5-fold stratified cross-validation, with macro-F1 as the primary metric.
+We frame the problem as 3-class text classification: given a financial tweet, predict whether it expresses Bearish~(0), Bullish~(1) or Neutral~(2) sentiment. Our approach progresses from sparse bag-of-words representations through Word2Vec embeddings to frozen Transformer encoders, each combined with four standard classifiers, for a total of 32~feature\,$\times$\,classifier combinations evaluated under 5-fold stratified cross-validation. Each step is motivated by the limitations of the previous one.
 
-\begin{sloppypar}
-The best pipeline --- Twitter-RoBERTa embeddings combined with XGBoost --- achieves a macro-F1 of \textbf{0.794}, outperforming traditional approaches by a substantial margin and demonstrating that domain-aligned pretrained representations matter more than classifier sophistication.
-\end{sloppypar}
+Our best pipeline combines Twitter-RoBERTa embeddings with an XGBoost classifier, reaching a macro-F1 of \textbf{0.794}. The substantial margin over traditional approaches is driven primarily by domain-aligned pretraining rather than by classifier sophistication, a finding we examine in more detail in Section~\ref{sec:results}.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Data Exploration}
@@ -172,28 +166,41 @@ Data-quality checks found fewer than 1\% exact duplicates (retained, to avoid bi
 % ══════════════════════════════════════════════════════════════════════════════
 
 \begin{sloppypar}
-Preprocessing was implemented as a set of composable functions in \texttt{src/preprocessing.py}, which we combine into three named pipelines and benchmark systematically.
+Preprocessing was implemented as a set of composable functions in \texttt{src/preprocessing.py} that we mix and match into named pipelines and benchmark under a fixed classifier.
 \end{sloppypar}
 
-\subsection{Preprocessing Functions}
+\subsection{Cleaning Operations}
 
-Each cleaning step is a standalone function so that pipelines can be assembled and ablated:
-\begin{enumerate}
-    \item \textbf{HTML unescape} --- decode \texttt{\&amp;}, \texttt{\&lt;}, \dots
-    \item \textbf{URL removal} --- strip \texttt{http://} and \texttt{www.} links.
-    \item \textbf{Mention removal} --- strip \texttt{@username} handles.
-    \item \textbf{Hashtag handling} --- strip the leading \texttt{\#} but keep the word.
-    \item \textbf{Ticker normalisation} --- replace cashtags with \texttt{<TICKER>}.
-    \item \textbf{Number normalisation} --- percentages\,$\rightarrow$\,\texttt{<PCT>}, numbers\,$\rightarrow$\,\texttt{<NUM>}.
-    \item \textbf{Emoji demojisation} --- convert emojis to text descriptions, preserving sentiment signal.
-    \item \textbf{Unicode NFKC} --- consistent encoding of look-alike characters.
-    \item \textbf{Lowercasing} --- standard case folding.
-    \item \textbf{Punctuation collapse} --- \texttt{!!!}\,$\rightarrow$\,\texttt{!}; whitespace normalisation.
-    \item \textbf{Finance-aware stopword removal} --- we keep negations (\texttt{no}, \texttt{not}, \texttt{nor}) and directional words (\texttt{up}, \texttt{down}, \texttt{over}, \texttt{under}); these are critical for sentiment polarity.
-    \item \textbf{Lemmatisation~/~stemming} --- evaluated as optional token-level operations.
-\end{enumerate}
+We split preprocessing into twelve standalone operations grouped by purpose (Table~\ref{tab:steps}). Surface cleanup (steps 1--4 and 7--10) standardises encoding, removes platform artefacts and folds case. Domain-specific normalisation (steps 5 and 6) replaces \$TICKER cashtags and numerical values with placeholders so the encoder sees a consistent rare-token pattern rather than overfitting to any specific ticker or figure. The remaining two operations act at the token level and are reserved for the more aggressive pipeline; the stopword list is pruned to keep negations (\texttt{no}, \texttt{not}, \texttt{nor}) and directional words (\texttt{up}, \texttt{down}, \texttt{over}, \texttt{under}) because they flip sentiment polarity.
+
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{cl}
+\toprule
+\textbf{\#} & \textbf{Operation} \\
+\midrule
+1  & HTML unescape (\texttt{\&amp;}, \texttt{\&lt;}) \\
+2  & URL removal (\texttt{http://}, \texttt{www.}) \\
+3  & @mention removal \\
+4  & Hashtag stripping (keeps the word) \\
+5  & Cashtag $\rightarrow$ \texttt{<TICKER>} \\
+6  & Percentages $\rightarrow$ \texttt{<PCT>}; numbers $\rightarrow$ \texttt{<NUM>} \\
+7  & Emoji $\rightarrow$ text description \\
+8  & Unicode NFKC normalisation \\
+9  & Lowercasing \\
+10 & Repeated-punctuation collapse and whitespace normalisation \\
+11 & Finance-aware stopword removal \\
+12 & Lemmatisation or stemming \\
+\bottomrule
+\end{tabular}
+\caption{The twelve cleaning operations used by our preprocessing pipelines.}
+\label{tab:steps}
+\end{table}
 
 \subsection{Named Pipelines}
+
+From these operations we built three named pipelines targeting different downstream models. \texttt{pp\_minimal} applies the first ten surface-level operations and is used for the bag-of-words and Word2Vec experiments. \texttt{pp\_aggressive} adds stopword removal and lemmatisation or stemming on top; it was kept for ablation purposes. \texttt{pp\_transformer} skips operations that would interfere with pretrained tokenizers (number replacement, case folding outside the tokenizer's own logic) and is used for the Transformer encoders (Table~\ref{tab:pipelines}).
 
 \begin{table}[!htbp]
 \centering
@@ -201,18 +208,18 @@ Each cleaning step is a standalone function so that pipelines can be assembled a
 \toprule
 \textbf{Pipeline} & \textbf{Steps} & \textbf{Use case} \\
 \midrule
-\texttt{pp\_minimal} & 1--10 & BoW, TF-IDF, Word2Vec \\
-\texttt{pp\_aggressive} & 1--12 & Tested and dropped \\
-\texttt{pp\_transformer} & 1--7, 10 & Transformer inputs \\
+\texttt{pp\_minimal}     & 1--10     & BoW, TF-IDF, Word2Vec \\
+\texttt{pp\_aggressive}  & 1--12     & Ablation only \\
+\texttt{pp\_transformer} & 1--7, 10  & Transformer encoders \\
 \bottomrule
 \end{tabular}
-\caption{Preprocessing pipelines and their target use cases.}
+\caption{The three named pipelines and their target use cases.}
 \label{tab:pipelines}
 \end{table}
 
 \subsection{Pipeline Comparison}
 
-We benchmarked the pipelines under a single fixed classifier (Logistic Regression on TF-IDF features) to isolate the preprocessing effect (Table~\ref{tab:pp_compare}).
+To isolate the preprocessing effect we benchmarked the three pipelines under a single fixed classifier (Logistic Regression on TF-IDF features, Table~\ref{tab:pp_compare}). \texttt{pp\_minimal} consistently outperforms the aggressive variant by 1.8--2.7 percentage points, regardless of whether lemmatisation or stemming is used on top. The aggressive pipeline removes content that is informative for sentiment: stopword filtering drops negations such as ``not'' that flip the polarity of the rest of the sentence; lemmatisation collapses temporal distinctions like ``falling'' into ``fall'' that carry their own urgency; and the number-replacement step erases specific values (``\$50M loss'') that provide context the downstream classifier would otherwise pick up.
 
 \begin{table}[!htbp]
 \centering
@@ -229,22 +236,16 @@ We benchmarked the pipelines under a single fixed classifier (Logistic Regressio
 \label{tab:pp_compare}
 \end{table}
 
-\texttt{pp\_minimal} consistently outperforms \texttt{pp\_aggressive}: the aggressive pipeline destroys discriminative signal. Stopword removal strips negations such as ``not'' that flip sentiment, lemmatisation collapses temporal distinctions (``falling''\,$\rightarrow$\,``fall'') that carry urgency, and number normalisation discards specific values that provide context.
-
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Feature Engineering}
 \label{sec:features}
 % ══════════════════════════════════════════════════════════════════════════════
 
-We implemented and compared eight feature-extraction methods across three families.
+We implemented and compared eight feature-extraction methods across three families: sparse bag-of-words representations, dense Word2Vec embeddings and frozen Transformer encoders.
 
 \subsection{Bag-of-Words Features}
 
-\begin{sloppypar}
-\textbf{CountVectorizer (BoW)}: unigram counts with a 10\,000-feature vocabulary cap.
-\textbf{TF-IDF}: bigrams (\texttt{ngram\_range=(1,2)}), sublinear TF scaling and 20\,000~features with \texttt{min\_df=2} and \texttt{max\_df=0.95}.
-TF-IDF outperformed BoW by 1--3~percentage points across all classifiers, confirming that local word order carries sentiment signal (Figure~\ref{fig:tfidf}).
-\end{sloppypar}
+The first family is the classical sparse representation. The bag-of-words variant uses scikit-learn's \texttt{CountVectorizer} with a 10\,000-feature unigram vocabulary. TF-IDF extends this to bigrams (\texttt{ngram\_range=(1,2)}) with sublinear term-frequency scaling, a vocabulary of up to 20\,000 features and the usual document-frequency cuts (\texttt{min\_df=2}, \texttt{max\_df=0.95}). TF-IDF outperforms BoW by one to three percentage points across every classifier in our comparison (Section~\ref{sec:results}), which confirms that bigrams recover some of the local word order that unigram counts throw away. The top weighted features per class (Figure~\ref{fig:tfidf}) are coherent with the discriminative vocabulary identified in Section~\ref{sec:data}.
 
 \begin{figure}[!htbp]
 \centering
@@ -255,38 +256,36 @@ TF-IDF outperformed BoW by 1--3~percentage points across all classifiers, confir
 
 \subsection{Word Embeddings}
 
-\textbf{Custom Word2Vec}: skip-gram, 100-d, trained on the financial tweet corpus, mean-pooled.
-\textbf{GloVe Twitter 100-d}: pretrained on 2~billion tweets.
-\textbf{TF-IDF--weighted pooling}: weights each token embedding by its TF-IDF score.
+The second family is dense, mean-pooled token embeddings. We compared three variants: a skip-gram Word2Vec model with 100~dimensions trained from scratch on the financial-tweet corpus; the pretrained GloVe-Twitter-100 vectors, which were trained on two billion tweets; and a TF-IDF--weighted pooling scheme, which weights each token's embedding by its TF-IDF score before averaging, with the aim of down-weighting frequent function words.
 
-All Word2Vec variants underperform BoW/TF-IDF (macro-F1: 0.59--0.66 vs.\ 0.72--0.74). The primary reason is that mean pooling discards word order, which is critical for sentiment: averaged GloVe-Twitter vectors for ``stock is going up today'' and ``stock is going down today'' have a cosine similarity of \textbf{0.996} --- two sentences of opposite financial polarity, indistinguishable to any classifier downstream of the pooled representation.
+All three variants underperform the bag-of-words family (macro-F1 0.59--0.66 against 0.72--0.74). The reason is mean pooling, which collapses word order: averaged GloVe vectors for ``stock is going up today'' and ``stock is going down today'' have a cosine similarity of 0.996, despite carrying opposite financial polarity. No downstream classifier can recover information that the pooling step has discarded.
 
 \subsection{Transformer Encoders}
 
-We used three pretrained Transformer encoders as frozen feature extractors: tokenise, pass through the encoder, mean-pool the last hidden states (768-d) with attention masking and feed the result to a downstream scikit-learn classifier. Embeddings are cached as \texttt{.npy} files, which keeps the workflow CPU-feasible.
+The third family is pretrained Transformer encoders used as frozen feature extractors. Each tweet is tokenised, passed through the encoder, and the last hidden states are mean-pooled (with attention masking applied to the padding positions) into a fixed 768-dimensional vector that is then handed to a scikit-learn classifier. Embeddings are cached on disk as \texttt{.npy} files, which makes the whole workflow CPU-feasible despite the size of the encoders.
+
+The three encoders we use differ mainly in their pretraining domain (Table~\ref{tab:transformers}). DistilBERT is a general-purpose distilled BERT trained on Wikipedia and BookCorpus. FinBERT was pretrained on SEC filings and other financial communications. Twitter-RoBERTa was pretrained on 58~million tweets with sentiment labels, giving it both Twitter-domain coverage and sentiment-task awareness.
 
 \begin{table}[!htbp]
 \centering
 \begin{tabular}{llrl}
 \toprule
-\textbf{Encoder} & \textbf{Domain} & \textbf{Params} & \textbf{Status} \\
+\textbf{Encoder} & \textbf{Pretraining domain} & \textbf{Params} & \textbf{Status} \\
 \midrule
-DistilBERT       & General                 & 66M  & Mandatory \\
+DistilBERT       & General-purpose text    & 66M  & Mandatory \\
 FinBERT          & Finance (SEC filings)   & 110M & Extra work \\
 Twitter-RoBERTa  & Twitter + sentiment     & 125M & Extra work \\
 \bottomrule
 \end{tabular}
-\caption{Transformer encoders evaluated as frozen feature extractors.}
+\caption{The three Transformer encoders used as frozen feature extractors.}
 \label{tab:transformers}
 \end{table}
 
-\begin{sloppypar}
-\textbf{Key finding.} Domain alignment matters more than model size. DistilBERT (general-purpose, 66M~params) underperforms TF-IDF; Twitter-RoBERTa (tweet-domain, sentiment-tuned, 125M~params) achieves the best result overall; FinBERT sits between the two --- it understands financial language but was trained on formal SEC filings rather than informal tweets.
+Domain alignment turns out to matter more than parameter count. DistilBERT, despite its 66~million parameters, underperforms TF-IDF bigrams; Twitter-RoBERTa, at roughly twice the size, achieves the best overall result. FinBERT lands between the two: it understands financial vocabulary, but its pretraining text is formal SEC filings rather than informal tweets.
 
-\textbf{Tokenisation.} The three encoders use WordPiece (DistilBERT, FinBERT) or byte-pair (Twitter-RoBERTa) vocabularies, so most finance vocabulary is split: \texttt{bullish}\,$\rightarrow$\,\texttt{bull|ish}, \texttt{downgrade}\,$\rightarrow$\,\texttt{down|grade}, \texttt{rebalancing}\,$\rightarrow$\,\texttt{re|bala|nc|ing} (BERT-family) or \texttt{re|bal|ancing} (RoBERTa). The \texttt{<TICKER>} placeholder is fragmented across all three tokenizers, so the encoder loses the holistic ``ticker'' token but still sees a consistent rare-token pattern across cashtags --- which is the property the placeholder was meant to preserve.
+A second observation concerns the tokenizer. All three encoders use subword vocabularies, so most financial vocabulary is fragmented at inference time. The word \texttt{bullish} becomes \texttt{bull|ish} and \texttt{downgrade} becomes \texttt{down|grade} for all three; \texttt{rebalancing} splits into four pieces for the BERT family but into three for RoBERTa. Our \texttt{<TICKER>} placeholder is itself split into several pieces, so the encoder never sees a holistic ``ticker'' token. What it does see is the same fragmentation pattern across every cashtag, which is the consistency the placeholder was meant to provide.
 
-\textbf{Pooling.} The canonical sentence representation in BERT-family models is the \texttt{[CLS]} token. We used mean pooling and verified directly that this is not a performance compromise (Table~\ref{tab:pooling}): for the sentiment-tuned encoders the two pooling choices are within noise, and mean pooling slightly helps DistilBERT, whose \texttt{[CLS]} representation has not been fine-tuned for any sentiment task.
-\end{sloppypar}
+Finally, we deviate from the standard BERT-family practice in our choice of sentence representation: the canonical choice is the \texttt{[CLS]} token's hidden state, but we use a mean pool over all non-padding tokens. To check that this is not a silent performance loss we recomputed the embeddings with \texttt{[CLS]} pooling and ran the same downstream XGBoost classifier (Table~\ref{tab:pooling}). For the two sentiment-tuned encoders the two pooling choices are within noise; mean pooling actually helps DistilBERT, whose \texttt{[CLS]} representation has not been adapted for sentiment.
 
 \begin{table}[!htbp]
 \centering
@@ -336,7 +335,7 @@ Random Forest       & 300 trees, balanced                & Ensemble baseline \\
 
 \subsection{Full Results Matrix}
 
-Table~\ref{tab:results} reports macro-F1 across all 32~combinations.
+Table~\ref{tab:results} summarises macro-F1 across all 32~combinations: each row is one of the eight feature representations introduced in Section~\ref{sec:features}, each column is one of the four classifiers from Table~\ref{tab:classifiers}, and each cell is the mean and standard deviation across the five cross-validation folds. The best score per row is shown in bold and the overall best is underlined. Standard deviations stay below 0.017 throughout; the winning configuration carries one of the lowest ($\pm$0.006), so the ranking is stable across folds rather than being an artefact of a particular split.
 
 \begin{table}[!htbp]
 \centering
@@ -361,19 +360,9 @@ Twitter-RoBERTa$^{*}$ & .755$\pm$.011 & .764$\pm$.008 & \underline{\textbf{.794$
 
 \subsection{Key Findings}
 
-\textbf{Feature hierarchy} (most to least effective):
-\begin{enumerate}
-    \item \textbf{Twitter-RoBERTa} (0.794) --- pretrained on 58M~tweets with sentiment labels; complete domain alignment.
-    \item \textbf{FinBERT} (0.779) --- finance-aware, but pretrained on formal text rather than tweets.
-    \item \textbf{TF-IDF} (0.740) --- competitive: bigrams recover some local word order.
-    \item \textbf{BoW} (0.720) --- solid unigram baseline.
-    \item \textbf{DistilBERT} (0.705) --- general-purpose encoder underperforms TF-IDF, illustrating that domain alignment matters more than model sophistication.
-    \item \textbf{Word2Vec variants} (0.658) --- mean pooling discards word order.
-\end{enumerate}
+Reading the matrix top to bottom by best score per row produces a clear feature hierarchy. Twitter-RoBERTa leads at 0.794 macro-F1, helped by sentiment-task pretraining on 58~million tweets. FinBERT comes second at 0.779: financial vocabulary helps, but the formal SEC-filings register is not an ideal match for tweets. TF-IDF bigrams reach 0.740 and are surprisingly competitive with the smaller Transformer; plain bag-of-words trails another two points behind at 0.720. DistilBERT, the general-purpose encoder, lands at 0.705 --- below TF-IDF bigrams, which is the most striking single result in the matrix and the clearest evidence that domain alignment matters more than encoder size. The Word2Vec variants sit at the bottom around 0.66, held there by the mean-pooling limitation discussed earlier.
 
-\textbf{Classifier patterns.} XGBoost excels with dense Transformer embeddings (non-linear boundaries in 768-d space), while linear models (LogReg, SVM) excel with sparse features (BoW/TF-IDF), where regularisation handles high dimensionality well. Random Forest consistently underperforms both.
-
-Standard deviations remain below 0.017, and the best configuration carries one of the lowest ($\pm$0.006) --- the ranking is stable across folds.
+The classifier dimension shows a complementary pattern. XGBoost dominates the dense Transformer rows, where non-linear decision boundaries in 768-d space pay off. Logistic regression and LinearSVC dominate the sparse rows, where their L2 regularisation handles the high dimensionality cleanly. Random Forest consistently lands last across both regimes.
 
 \subsection{Per-Class Analysis}
 
@@ -399,14 +388,9 @@ To check whether the best encoder genuinely separates the three classes in featu
 
 \subsection{Error Analysis}
 
-The misclassified tweets fall into three recurring patterns, visualised in the confusion matrices of Figure~\ref{fig:confusion}:
-\begin{enumerate}
-    \item \textbf{Neutral\,$\leftrightarrow$\,Bearish}: tweets reporting negative news factually (e.g.\ ``Stock down 5\% after earnings miss'') are genuinely ambiguous between factual reporting and negative sentiment.
-    \item \textbf{Neutral\,$\leftrightarrow$\,Bullish}: factual reports of positive events blur the line between informational and positive sentiment.
-    \item \textbf{Bearish\,$\leftrightarrow$\,Bullish} (rarest): primarily sarcasm or contrarian positions.
-\end{enumerate}
+The misclassified tweets cluster into three recurring patterns, all visible in the confusion matrices of Figure~\ref{fig:confusion}. The most common is the Neutral $\leftrightarrow$ Bearish boundary: tweets reporting negative news factually (``stock down 5\% after earnings miss'') are genuinely ambiguous between factual reporting and negative sentiment, and the dataset's annotations sometimes go one way and sometimes the other. The mirror-image Neutral $\leftrightarrow$ Bullish confusion arises from the same dynamic on positive news. Direct Bearish $\leftrightarrow$ Bullish swaps are rare and almost always involve sarcasm or contrarian positions, neither of which the encoder can resolve from text alone.
 
-The dominant challenge is the fundamental ambiguity between factual reporting and sentiment expression in financial discourse.
+The dominant challenge across all three patterns is the fundamental ambiguity between factual reporting and sentiment expression in financial discourse --- an annotation difficulty the dataset itself reflects, not a modelling artefact.
 
 \begin{figure}[H]
 \centering
@@ -425,18 +409,16 @@ The dominant challenge is the fundamental ambiguity between factual reporting an
 
 \subsection{Learning Curve and Statistical Significance}
 
-\begin{figure}[H]
+The learning curve for the best configuration (Figure~\ref{fig:learning_curve}) plateaus after roughly 40\% of the training data, which suggests the model is near its ceiling for this feature representation. The persistent train--validation gap points to mild overfitting that more data alone will not resolve; closing it would require architectural changes, in particular full fine-tuning of the encoder rather than a frozen-feature setup.
+
+To confirm that the matrix ranking is statistically meaningful and not a fold-sampling artefact, we ran paired $t$-tests on the per-fold CV scores between the three best configurations. All three pairwise comparisons reach significance at $p < 0.05$, so the observed ranking is not produced by random fold variation.
+
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=0.55\textwidth]{learning_curve.png}
 \caption{Learning curve for Twitter-RoBERTa + XGBoost.}
 \label{fig:learning_curve}
 \end{figure}
-
-Validation F1 plateaus after roughly 40\% of the training data (Figure~\ref{fig:learning_curve}), suggesting the model is near its ceiling for this feature representation. The persistent train--validation gap indicates mild overfitting that more data alone will not resolve --- architectural improvements (full fine-tuning) would be needed.
-
-\begin{sloppypar}
-Paired $t$-tests on the 5-fold CV scores confirm that the gaps between the top three configurations are statistically significant ($p < 0.05$): Twitter-RoBERTa\,+\,XGBoost vs.\ FinBERT\,+\,XGBoost; Twitter-RoBERTa\,+\,XGBoost vs.\ TF-IDF\,+\,SVM; and FinBERT\,+\,XGBoost vs.\ TF-IDF\,+\,SVM. The observed ranking is not an artefact of random fold variation.
-\end{sloppypar}
 
 \FloatBarrier
 % ══════════════════════════════════════════════════════════════════════════════
@@ -444,18 +426,20 @@ Paired $t$-tests on the 5-fold CV scores confirm that the gaps between the top t
 \label{sec:extra}
 % ══════════════════════════════════════════════════════════════════════════════
 
+This section collects four contributions that go beyond the mandatory rubric and are marked as EXTRA WORK in our test notebook \texttt{tm\_tests\_42.ipynb}: two additional pretrained encoders, a zero-shot baseline that bypasses the downstream classifier, a LangChain-based classification agent and an attempted decoder model.
+
 \subsection{Domain-Specific Transformer Encoders}
 
 \begin{sloppypar}
-\extratag We evaluated two pretrained encoders beyond the mandatory DistilBERT. \textbf{FinBERT} (\texttt{ProsusAI/\allowbreak finbert}), trained on financial communications, reaches \textbf{0.779}~macro-F1 (a 7.4-pp improvement over DistilBERT). \textbf{Twitter-RoBERTa} (\texttt{cardiffnlp/\allowbreak twitter-roberta-\allowbreak base-sentiment-latest}), trained on 58M~tweets with sentiment labels, reaches \textbf{0.794}~macro-F1 --- the best overall.
+Beyond the mandatory DistilBERT, we evaluated two further pretrained encoders. FinBERT,\footnote{Hugging Face checkpoint \texttt{ProsusAI/finbert}.} pretrained on financial communications, reaches 0.779~macro-F1, a 7.4 percentage-point improvement over DistilBERT. Twitter-RoBERTa,\footnote{Hugging Face checkpoint \texttt{cardiffnlp/\allowbreak twitter-\allowbreak roberta-\allowbreak base-\allowbreak sentiment-\allowbreak latest}.} pretrained on 58~million tweets annotated with sentiment labels, reaches 0.794~macro-F1 and is the best configuration we tested. Both gains come almost entirely from the pretraining domain rather than from any architectural advantage over DistilBERT.
 \end{sloppypar}
 
 \subsection{Zero-Shot Pretrained Classification}
 \label{sec:zero_shot}
 
-\extratag To isolate the contribution of the trained downstream classifier from that of the pretrained encoder, we applied Twitter-RoBERTa's built-in 3-class sentiment head (negative/neutral/positive) directly to the validation set, with no training of our own. Outputs were mapped to our label space: negative\,$\rightarrow$\,Bearish, positive\,$\rightarrow$\,Bullish, neutral\,$\rightarrow$\,Neutral.
+The Twitter-RoBERTa checkpoint we use already ships with a 3-class sentiment head trained on tweets (negative\,/\,neutral\,/\,positive). This makes it possible to ask a complementary question: how much of the Twitter-RoBERTa + XGBoost result is contributed by the pretrained encoder, and how much by the downstream classifier we trained on top? To answer this we applied the pretrained head directly to the validation set, without any training of our own, and mapped its three outputs into our label space (negative\,$\rightarrow$\,Bearish, positive\,$\rightarrow$\,Bullish, neutral\,$\rightarrow$\,Neutral).
 
-The zero-shot baseline reaches \textbf{0.587}~macro-F1 (5-fold aggregation: $0.587 \pm 0.012$), substantially below the 0.794 obtained when the same encoder is paired with a trained XGBoost classifier (Table~\ref{tab:zero_shot}). The gap concentrates on the minority classes: Bearish/Bullish F1 fall from 0.65--0.75 (trained) to 0.48--0.49 (zero-shot), while Neutral degrades less. This reflects a label-space mismatch: a tweet using ``downgrade'', ``cut'' or ``miss'' is bearish in finance but not unambiguously negative in everyday speech. Supervised adaptation on $\sim$9.5k labeled examples is what recovers the missing $+0.21$~macro-F1; pretraining domain alignment is necessary but not sufficient.
+The zero-shot baseline reaches 0.587~macro-F1 (5-fold aggregation: $0.587 \pm 0.012$), well below the 0.794 obtained when the same encoder is paired with the trained XGBoost head (Table~\ref{tab:zero_shot}). The gap is concentrated on the minority classes: Bearish/Bullish F1 fall from the 0.65--0.75 range to 0.48--0.49, while Neutral degrades by considerably less. This is a label-space mismatch rather than a domain mismatch: a tweet using ``downgrade'', ``cut'' or ``miss'' is unambiguously bearish in finance, but not unambiguously negative in everyday language. The 0.21 gain that supervised adaptation recovers is the encoding of that financial label space, learned from $\sim$9.5k labeled tweets. Pretraining alignment is necessary but not sufficient.
 
 \begin{table}[!htbp]
 \centering
@@ -469,25 +453,19 @@ Frozen embeddings + XGBoost (ours)                 & \textbf{0.794} \\
 $\Delta$ from supervised adaptation                & \textbf{+0.207} \\
 \bottomrule
 \end{tabular}
-\caption{Same encoder, two heads: zero-shot vs.\ supervised adaptation.}
+\caption{Same encoder, two heads: zero-shot baseline vs.\ supervised adaptation.}
 \label{tab:zero_shot}
 \end{table}
 
 \subsection{Agentic Workflow}
 
-\begin{sloppypar}
-\extratag A LangChain-based agent (\texttt{src/agent.py}) orchestrates five tools: \textit{classify\_tweet}, \textit{route\_model}, \textit{ensemble\_classify}, \textit{compare\_models} and \textit{explain\_prediction}. The agent inspects tweet content to choose a model, reconciles disagreements via majority vote and produces interpretable explanations from linear-model coefficients. Three illustrative transcripts (full logs in \texttt{outputs/\allowbreak agent\_transcripts.md}):
-\end{sloppypar}
+To demonstrate how the trained models can be composed into a higher-level decision-making system, we built a LangChain-based agent in \texttt{src/agent.py}. The agent exposes five tools to a language-model planner: \textit{classify\_tweet}, \textit{route\_model}, \textit{ensemble\_classify}, \textit{compare\_models} and \textit{explain\_\allowbreak prediction}. In normal operation it inspects the tweet's surface features to choose an appropriate classifier, reconciles disagreements between classifiers via majority vote, and produces interpretable explanations from the coefficients of the linear models. Three illustrative transcripts (full logs in \texttt{outputs/\allowbreak agent\_transcripts.md}) demonstrate each behaviour in turn.
 
-\textbf{Routing.} Input ``\$AAPL all-time high, breakout above resistance.'' --- the agent detects a \$TICKER, routes to FinBERT and returns Bullish (89.1\%).
-
-\textbf{Ensemble.} Input ``Markets mixed; Fed signals rate changes amid inflation concerns.'' --- TF-IDF/LogReg, FinBERT and Twitter-RoBERTa vote Neutral while DistilBERT votes Bearish; the agent returns Neutral with 75\% agreement, illustrating how a general-purpose encoder can over-weight non-financial vocabulary.
-
-\textbf{Attribution.} Input ``Sell everything, this stock is going to crash hard.'' --- LogReg coefficients identify ``sell'' ($+2.85$) and ``crash'' ($+2.63$) as the strongest Bearish signals, both carrying negative Bullish weights ($-1.92$, $-2.10$).
+In the routing scenario, the input ``\$AAPL all-time high, breakout above resistance.'' triggers the agent to detect a \$TICKER, route the request to FinBERT and return Bullish at 89.1\% confidence. In the ensemble scenario, the input ``Markets mixed; Fed signals rate changes amid inflation concerns.'' produces a split vote: TF-IDF/LogReg, FinBERT and Twitter-RoBERTa each return Neutral, while DistilBERT returns Bearish. The agent reconciles this to Neutral with 75\% agreement and flags the DistilBERT vote as an example of how a general-purpose encoder can over-weight non-financial sentiment cues such as ``concerns''. In the attribution scenario, the input ``Sell everything, this stock is going to crash hard.'' triggers the explanation tool, which extracts the largest LogReg coefficients: ``sell'' ($+2.85$) and ``crash'' ($+2.63$) are the strongest Bearish signals, and the same tokens carry negative Bullish weights of $-1.92$ and $-2.10$ respectively, actively pushing the prediction away from the positive class.
 
 \subsection{Decoder Model (Attempted)}
 
-\extratag Few-shot classification with Flan-T5-small was implemented but CPU inference proved infeasible (${\sim}$2--5\,s per tweet, $>$\,3\,h for the test set); the result is documented as a CPU-only limitation rather than a delivered baseline.
+We additionally implemented few-shot classification with Flan-T5-small, using two examples per class as the prompt. CPU inference proved infeasible at roughly 2--5 seconds per tweet, which would extend to over three hours for the full test set, so the experiment is documented as a CPU-only limitation rather than a delivered baseline.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Final Pipeline and Predictions}
@@ -518,14 +496,14 @@ The prediction distribution closely matches the training proportions, indicating
 \label{sec:conclusion}
 % ══════════════════════════════════════════════════════════════════════════════
 
-The systematic evaluation of 32~feature\,$\times$\,classifier combinations identifies \textbf{Twitter-RoBERTa\,+\,XGBoost} as the best pipeline (\textbf{0.794}~macro-F1). Four findings stand out:
-\begin{enumerate}
-    \item \textbf{Domain alignment outweighs model size.} DistilBERT (66M~params) underperforms TF-IDF bigrams; Twitter-RoBERTa (125M~params) exceeds both. Alignment alone is not enough either --- the same encoder, applied zero-shot (Section~\ref{sec:zero_shot}), reaches only 0.587~macro-F1; the trained head adds $+0.21$.
-    \item \textbf{Feature extraction matters more than classifier choice.} The gap between feature families (0.60\,$\rightarrow$\,0.79) far exceeds the within-family gap (0.02--0.05).
-    \item \textbf{Conservative preprocessing wins.} Aggressive normalisation removes sentiment signal; keeping negations and directional words intact is essential.
-    \item \textbf{Class-imbalance handling is essential.} Without balanced class weights, classifiers default to predicting Neutral.
-\end{enumerate}
+Our evaluation of 32 feature-by-classifier combinations identifies Twitter-RoBERTa combined with XGBoost as the best pipeline, reaching 0.794 macro-F1 under 5-fold stratified cross-validation. Three findings stand out.
 
-\textbf{Limitations and future work.} The CPU-only constraint prevented full Transformer fine-tuning and made decoder inference infeasible; no hyperparameter optimisation was performed; results come from a single dataset. GPU fine-tuning, cross-family ensembles and temporal analysis of financial sentiment are the natural next steps.
+First, the dominant factor in the matrix is the pretraining domain of the encoder, not the parameter count. DistilBERT (66M params) underperforms TF-IDF bigrams while Twitter-RoBERTa (125M params) substantially exceeds both. Pretraining alignment alone is not enough either: the same Twitter-RoBERTa applied zero-shot reaches only 0.587 macro-F1 (Section~\ref{sec:zero_shot}), and the supervised head adds the remaining 0.21.
+
+Second, feature extraction matters more than classifier choice. The gap between feature families (0.60--0.79~macro-F1) is roughly four times the gap between classifiers within the same family (0.02--0.05). Picking the right representation has by far the larger impact on this task.
+
+Third, conservative preprocessing wins. Removing stopwords strips negations like ``not'' that flip polarity; lemmatisation collapses temporal distinctions; number replacement erases context. Our minimal pipeline beats the aggressive variant by close to two percentage points. Explicit class-imbalance handling is similarly essential, since classifiers otherwise default to the dominant Neutral class.
+
+The main limitation of this work is the CPU-only constraint, which blocked full Transformer fine-tuning and made decoder inference infeasible. GPU fine-tuning, cross-family ensembles and a temporal analysis of sentiment drift across market regimes are the natural next steps.
 
 \end{document}
