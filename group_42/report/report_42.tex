@@ -466,9 +466,11 @@ In the routing scenario, the input ``\$AAPL all-time high, breakout above resist
 \subsection{Decoder Model (Few-Shot)}
 \label{sec:decoder}
 
-To complete the encoder--decoder picture, we evaluated Flan-T5 with in-context few-shot prompting, two examples per class drawn from the training split. Each tweet is classified by a single forward pass through the seq2seq model with greedy decoding (max\_new\_tokens$=$5). Batched MPS inference brings the runtime to roughly two and a half minutes for the smallest checkpoint and well under an hour for the larger ones, so the original CPU-only feasibility concern no longer applies.
+To complete the encoder--decoder picture, we evaluated three Flan-T5 checkpoints with in-context few-shot prompting, two examples per class drawn from the training split. Each tweet is classified by a single forward pass through the seq2seq model with greedy decoding (max\_new\_tokens$=$5). Batched MPS inference brings the runtime to roughly 2.5~min for the small checkpoint, 35~min for base and 33~min for large, so the original CPU-only feasibility concern no longer applies.
 
-The results are negative but informative (Table~\ref{tab:decoder}). Flan-T5-small barely exceeds chance; it predicts the majority class almost exclusively and never produces a confident Bullish label. Flan-T5-base improves to 0.310 macro-F1 by spreading its predictions across all three classes, but the per-class F1 scores (0.29 for Bearish, 0.33 for Bullish, 0.30 for Neutral) sit far below those of the simplest BoW baseline. The takeaway is consistent with the zero-shot result of Section~\ref{sec:zero_shot}: a generic instruction-tuned model has no notion of the financial bearish/bullish distinction that distinguishes our minority classes, and few-shot prompts with two examples per class are not enough to teach it that distinction at this scale.
+Scaling helps substantially (Table~\ref{tab:decoder}). Flan-T5-small barely exceeds chance, predicting Neutral almost exclusively and never producing a confident Bullish label. Flan-T5-base reaches 0.310 by spreading its predictions across all three classes. Flan-T5-large adds another 17~percentage points to land at 0.485 macro-F1 with a markedly different error profile: it identifies Neutral very well (F1 0.80) and handles Bullish moderately (F1 0.56), but collapses on Bearish (recall 0.06). The model has learnt to recognise positive and neutral financial language but has no notion of the bearish direction beyond what the two negative examples provided.
+
+Even at this scale the decoder remains below the zero-shot Twitter-RoBERTa baseline of Section~\ref{sec:zero_shot}, and a long way below the simplest trained encoder configuration. The conclusion is consistent across the three checkpoints: generic instruction-tuned models lack the financial bearish/bullish distinction that defines our minority classes, and two-shot prompts are not enough to teach it.
 
 \begin{table}[!htbp]
 \centering
@@ -476,15 +478,16 @@ The results are negative but informative (Table~\ref{tab:decoder}). Flan-T5-smal
 \toprule
 \textbf{Approach} & \textbf{Macro-F1} \\
 \midrule
-Flan-T5-small (few-shot, 2 examples per class) & 0.244 \\
-Flan-T5-base  (few-shot, 2 examples per class) & 0.310 \\
+Flan-T5-small (few-shot, 77M~params)  & 0.244 \\
+Flan-T5-base  (few-shot, 248M~params) & 0.310 \\
+Flan-T5-large (few-shot, 780M~params) & 0.485 \\
 \midrule
 Zero-shot Twitter-RoBERTa (Section~\ref{sec:zero_shot}) & 0.587 \\
 TF-IDF + SVM (best traditional)                         & 0.740 \\
 Twitter-RoBERTa + XGBoost (ours, best overall)          & \textbf{0.794} \\
 \bottomrule
 \end{tabular}
-\caption{Few-shot decoder performance against the encoder-based methods. Larger checkpoints help, but the gap to a trained downstream classifier remains large.}
+\caption{Few-shot decoder performance against encoder-based methods. Larger checkpoints help substantially, but even Flan-T5-large remains below the simplest pretrained-encoder baseline.}
 \label{tab:decoder}
 \end{table}
 
