@@ -1,88 +1,87 @@
 # Group 42 — Financial Tweet Sentiment Classification
 
-**Course**: Text Mining, Spring 2025/2026 — NOVA IMS
+Text Mining, Spring 2025/2026 — NOVA IMS
 
-## Team Members
+3-class sentiment classification on financial tweets (Bearish / Bullish / Neutral)
+with a systematic comparison of 32 feature × classifier combinations under 5-fold
+stratified cross-validation. Best pipeline reaches **0.794 macro-F1**.
 
-| Name | Student ID | Sections |
-|------|-----------|----------|
-| TBD  | TBD       | TBD      |
-| TBD  | TBD       | TBD      |
-| TBD  | TBD       | TBD      |
-| TBD  | TBD       | TBD      |
+## Headline results
 
-## Task
+| Method | Macro-F1 |
+|---|---|
+| Bag-of-Words + LogReg | 0.720 |
+| TF-IDF + SVM | 0.740 |
+| Word2Vec mean-pool + XGBoost | 0.658 |
+| DistilBERT (frozen) + SVM | 0.705 |
+| FinBERT (frozen) + XGBoost | 0.779 |
+| **Twitter-RoBERTa (frozen) + XGBoost** | **0.794** |
+| Zero-shot Twitter-RoBERTa head (no training) | 0.587 |
+| Flan-T5-large few-shot (no training) | 0.485 |
 
-Classify financial tweets into three sentiment classes:
-- **0 — Bearish**: negative market sentiment
-- **1 — Bullish**: positive market sentiment
-- **2 — Neutral**: no clear directional sentiment
+Full ranking, per-class analysis and statistical-significance tests in
+[report/report_42.pdf](report/report_42.pdf).
 
-## Repository Structure
+## Layout
 
 ```
 group_42/
 ├── notebooks/
-│   ├── tm_tests_42.ipynb    # Full experimentation notebook
-│   └── tm_final_42.ipynb    # Final pipeline (runs end-to-end < 20 min)
-├── src/                     # Reusable modules
-│   ├── preprocessing.py     # Text cleaning & normalization
-│   ├── features.py          # Feature extraction (BoW, W2V, Transformers)
-│   ├── models.py            # Classifier factories
-│   ├── evaluation.py        # Metrics & visualization
-│   └── agent.py             # LangChain agentic workflow (extra credit)
+│   ├── tm_tests_42.ipynb         # Full experimentation
+│   └── tm_final_42.ipynb         # Final pipeline → pred_42.csv (<20 min on CPU)
+├── src/
+│   ├── preprocessing.py          # Composable cleaning + 3 named pipelines
+│   ├── features.py               # BoW, TF-IDF, Word2Vec, Transformer extractors
+│   ├── models.py                 # Classifier factories + few-shot decoder
+│   ├── evaluation.py             # Metrics, CV, plots
+│   └── agent.py                  # LangChain agent (extra work)
+├── data/                         # train.csv, test.csv (gitignored, synced out-of-band)
 ├── outputs/
-│   └── pred_42.csv          # Final test predictions
-├── figures/                 # Saved plots (300 dpi PNGs)
-├── models/                  # Cached models & embeddings (gitignored)
+│   ├── pred_42.csv               # Final predictions
+│   ├── final_results_*.csv       # Results matrix
+│   ├── agent_transcripts.md      # Agent traces
+│   └── decoder_cache_*.json      # Pre-computed Flan-T5 predictions
+├── figures/                      # 300 dpi PNGs used by the report
+├── models/                       # Cached embeddings (gitignored)
 └── report/
-    └── report_42.pdf        # Final report (≤ 15 pages)
+    ├── report_42.tex
+    └── report_42.pdf             # 15 pages
 ```
 
 ## Setup
 
 ```bash
-# 1. Create and activate virtual environment
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-
-# 2. Install dependencies
+source .venv/bin/activate                    # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-
-# 3. Install nbstripout (prevents notebook merge conflicts)
-pip install nbstripout
-nbstripout --install
-
-# 4. Download NLTK data
-python -c "import nltk; nltk.download('stopwords'); nltk.download('wordnet'); nltk.download('punkt'); nltk.download('punkt_tab'); nltk.download('averaged_perceptron_tagger')"
-
-# 5. Place data files
-# Copy train.csv and test.csv into data/
+pip install nbstripout && nbstripout --install
+python -c "import nltk; [nltk.download(p, quiet=True) for p in ['stopwords','wordnet','punkt','punkt_tab']]"
+# Place train.csv and test.csv into data/
 ```
 
-## Running
+## Run
 
-### Experimentation notebook
 ```bash
-jupyter notebook notebooks/tm_tests_42.ipynb
+jupyter notebook notebooks/tm_tests_42.ipynb     # full experimentation (~15 min on MPS)
+jupyter notebook notebooks/tm_final_42.ipynb     # produces outputs/pred_42.csv (<20 min on CPU)
 ```
 
-### Final pipeline (produces predictions)
-```bash
-jupyter notebook notebooks/tm_final_42.ipynb
-# Run all cells — completes in < 20 minutes on CPU
-# Output: outputs/pred_42.csv
-```
+The decoder cells use cached predictions in `outputs/decoder_cache_*.json`, so they
+finish in seconds. To regenerate from scratch, delete the cache and rerun — first run
+takes ~35 min on MPS for Flan-T5-base.
 
-### Agentic workflow (extra credit)
-```bash
-# Set up .env with API keys first (see .env.example)
-python -m src.agent
-```
+## Reproducibility
 
-## Notes
+- `random_state=42` everywhere (splits, CV, classifiers, embeddings).
+- All Transformer embeddings cached to `models/*.npy` on first run.
+- Final pipeline (`tm_final_42.ipynb`) runs end-to-end with **Restart & Run All** in
+  under 20 minutes on a CPU laptop.
 
-- **CPU-only**: All models are designed to run on CPU laptops
-- **Reproducibility**: `random_state=42` is used everywhere
-- **Cached embeddings**: Transformer embeddings are cached to `models/*.npy` — first run takes ~30 min, subsequent runs use cache
-- Group number: 42
+## Team
+
+| Name | Student ID |
+|------|-----------|
+| TBD  | TBD       |
+| TBD  | TBD       |
+| TBD  | TBD       |
+| TBD  | TBD       |
