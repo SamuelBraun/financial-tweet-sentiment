@@ -1,0 +1,57 @@
+{
+  "model": "google/flan-t5-small",
+  "approach": "few-shot (2 examples per class, frozen decoder)",
+  "examples": [
+    {
+      "text": "Surprise German Factory Order Slump Shows Worst Isn't Over",
+      "label": 0,
+      "label_name": "Bearish"
+    },
+    {
+      "text": "Hedge Funds Have Never Been This Bullish On LiqTech International Inc (LIQT)",
+      "label": 1,
+      "label_name": "Bullish"
+    },
+    {
+      "text": "$TEUM - Pareteum +8% after CEO termination https://t.co/a4kFbWyQ6N",
+      "label": 1,
+      "label_name": "Bullish"
+    },
+    {
+      "text": "$AMRH (-8.7% pre) AMERI Holdings (AMRH) Announces 1-for-25 Reverse Stock Split to Regain Nasdaq Compliance\n\nhttps://t.co/XP3DTVbbMM",
+      "label": 0,
+      "label_name": "Bearish"
+    },
+    {
+      "text": "$BEPTF $BCHEY - Beach Energy declares AUD 1.00 dividend https://t.co/MuB1agcYQ8",
+      "label": 2,
+      "label_name": "Neutral"
+    },
+    {
+      "text": "As Boeing Halts Max Line, Airbus Can\u2019t Make Jets Fast Enough",
+      "label": 2,
+      "label_name": "Neutral"
+    }
+  ],
+  "val_set": {
+    "n": 1909,
+    "macro_f1": 0.2437823909603214,
+    "accuracy": 0.38344683080146674
+  },
+  "full_set": {
+    "n": 9543,
+    "macro_f1_single": 0.2420960676829302,
+    "cv_mean": 0.24207369713527976,
+    "cv_std": 0.0037439939506643495,
+    "fold_scores": [
+      0.24792990230371156,
+      0.23698352730610794,
+      0.2425472875142141,
+      0.24356218475771432,
+      0.2393455837946508
+    ]
+  },
+  "n_folds": 5,
+  "random_state": 42,
+  "batch_size": 16
+}

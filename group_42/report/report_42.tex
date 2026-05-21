@@ -463,9 +463,30 @@ To demonstrate how the trained models can be composed into a higher-level decisi
 
 In the routing scenario, the input ``\$AAPL all-time high, breakout above resistance.'' triggers the agent to detect a \$TICKER, route the request to FinBERT and return Bullish at 89.1\% confidence. In the ensemble scenario, the input ``Markets mixed; Fed signals rate changes amid inflation concerns.'' produces a split vote: TF-IDF/LogReg, FinBERT and Twitter-RoBERTa each return Neutral, while DistilBERT returns Bearish. The agent reconciles this to Neutral with 75\% agreement and flags the DistilBERT vote as an example of how a general-purpose encoder can over-weight non-financial sentiment cues such as ``concerns''. In the attribution scenario, the input ``Sell everything, this stock is going to crash hard.'' triggers the explanation tool, which extracts the largest LogReg coefficients: ``sell'' ($+2.85$) and ``crash'' ($+2.63$) are the strongest Bearish signals, and the same tokens carry negative Bullish weights of $-1.92$ and $-2.10$ respectively, actively pushing the prediction away from the positive class.
 
-\subsection{Decoder Model (Attempted)}
+\subsection{Decoder Model (Few-Shot)}
+\label{sec:decoder}
 
-We additionally implemented few-shot classification with Flan-T5-small, using two examples per class as the prompt. CPU inference proved infeasible at roughly 2--5 seconds per tweet, which would extend to over three hours for the full test set, so the experiment is documented as a CPU-only limitation rather than a delivered baseline.
+To complete the encoder--decoder picture, we evaluated Flan-T5 with in-context few-shot prompting, two examples per class drawn from the training split. Each tweet is classified by a single forward pass through the seq2seq model with greedy decoding (max\_new\_tokens$=$5). Batched MPS inference brings the runtime to roughly two and a half minutes for the smallest checkpoint and well under an hour for the larger ones, so the original CPU-only feasibility concern no longer applies.
+
+The results are negative but informative (Table~\ref{tab:decoder}). Flan-T5-small barely exceeds chance; it predicts the majority class almost exclusively and never produces a confident Bullish label. Flan-T5-base improves to 0.310 macro-F1 by spreading its predictions across all three classes, but the per-class F1 scores (0.29 for Bearish, 0.33 for Bullish, 0.30 for Neutral) sit far below those of the simplest BoW baseline. The takeaway is consistent with the zero-shot result of Section~\ref{sec:zero_shot}: a generic instruction-tuned model has no notion of the financial bearish/bullish distinction that distinguishes our minority classes, and few-shot prompts with two examples per class are not enough to teach it that distinction at this scale.
+
+\begin{table}[!htbp]
+\centering
+\begin{tabular}{lr}
+\toprule
+\textbf{Approach} & \textbf{Macro-F1} \\
+\midrule
+Flan-T5-small (few-shot, 2 examples per class) & 0.244 \\
+Flan-T5-base  (few-shot, 2 examples per class) & 0.310 \\
+\midrule
+Zero-shot Twitter-RoBERTa (Section~\ref{sec:zero_shot}) & 0.587 \\
+TF-IDF + SVM (best traditional)                         & 0.740 \\
+Twitter-RoBERTa + XGBoost (ours, best overall)          & \textbf{0.794} \\
+\bottomrule
+\end{tabular}
+\caption{Few-shot decoder performance against the encoder-based methods. Larger checkpoints help, but the gap to a trained downstream classifier remains large.}
+\label{tab:decoder}
+\end{table}
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Final Pipeline and Predictions}
@@ -504,6 +525,6 @@ Second, feature extraction matters more than classifier choice. The gap between 
 
 Third, conservative preprocessing wins. Removing stopwords strips negations like ``not'' that flip polarity; lemmatisation collapses temporal distinctions; number replacement erases context. Our minimal pipeline beats the aggressive variant by close to two percentage points. Explicit class-imbalance handling is similarly essential, since classifiers otherwise default to the dominant Neutral class.
 
-The main limitation of this work is the CPU-only constraint, which blocked full Transformer fine-tuning and made decoder inference infeasible. GPU fine-tuning, cross-family ensembles and a temporal analysis of sentiment drift across market regimes are the natural next steps.
+The main limitation of this work is the CPU-only constraint, which blocked full Transformer fine-tuning; on Apple-Silicon MPS our frozen-encoder and few-shot decoder pipelines remained tractable, but full fine-tuning is what would be needed to close the remaining train--validation gap. GPU fine-tuning, cross-family ensembles and a temporal analysis of sentiment drift across market regimes are the natural next steps.
 
 \end{document}

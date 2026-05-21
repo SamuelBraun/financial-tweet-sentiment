@@ -346,28 +346,51 @@ def decoder_classify_batch(
         return predictions
 
     if model_name.startswith("flan-t5"):
-        # Local Flan-T5
+        # Local Flan-T5 with batched generation on MPS/CUDA/CPU
         from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
         import torch
 
         full_name = f"google/{model_name}"
         tokenizer = AutoTokenizer.from_pretrained(full_name)
-        model = AutoModelForSeq2SeqLM.from_pretrained(full_name)
-        model.eval()
+        model = AutoModelForSeq2SeqLM.from_pretrained(full_name).eval()
 
-        for idx, tweet in zip(uncached_indices, uncached_tweets):
-            prompt = build_fewshot_prompt(tweet, examples)
-            inputs = tokenizer(prompt, return_tensors="pt", truncation=True,
-                               max_length=512)
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
+        model = model.to(device)
+
+        # Batch size depends on model size; tweets are short so 4-16 is fine
+        batch_size = {"flan-t5-small": 16, "flan-t5-base": 8}.get(model_name, 4)
+        prompts = [build_fewshot_prompt(t, examples) for t in uncached_tweets]
+
+        for i in range(0, len(prompts), batch_size):
+            batch_prompts = prompts[i:i + batch_size]
+            batch_idx = uncached_indices[i:i + batch_size]
+            batch_tweets = uncached_tweets[i:i + batch_size]
+            enc = tokenizer(batch_prompts, return_tensors="pt",
+                            padding=True, truncation=True, max_length=384)
+            enc = {k: v.to(device) for k, v in enc.items()}
             with torch.no_grad():
-                outputs = model.generate(**inputs, max_new_tokens=5)
-            response = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
-
-            # Parse label
-            match = re.search(r"[012]", response)
-            label = int(match.group()) if match else 2  # default Neutral
-            predictions[idx] = label
-            cache[tweet] = label
+                outputs = model.generate(
+                    **enc, max_new_tokens=5, do_sample=False, num_beams=1,
+                )
+            decoded = tokenizer.batch_decode(outputs, skip_special_tokens=True)
+            for idx, tweet, response in zip(batch_idx, batch_tweets, decoded):
+                response = response.strip().lower()
+                match = re.search(r"[012]", response)
+                if match:
+                    label = int(match.group())
+                elif "bear" in response:
+                    label = 0
+                elif "bull" in response:
+                    label = 1
+                else:
+                    label = 2  # default Neutral
+                predictions[idx] = label
+                cache[tweet] = label
 
     elif model_name == "api":
         # API-based classification (OpenAI or Anthropic)
