@@ -171,7 +171,7 @@ Preprocessing was implemented as a set of composable functions in \texttt{src/pr
 
 \subsection{Cleaning Operations}
 
-We split preprocessing into twelve standalone operations grouped by purpose (Table~\ref{tab:steps}). Surface cleanup (steps 1--4 and 7--10) standardises encoding, removes platform artefacts and folds case. Domain-specific normalisation (steps 5 and 6) replaces \$TICKER cashtags and numerical values with placeholders so the encoder sees a consistent rare-token pattern rather than overfitting to any specific ticker or figure. The remaining two operations act at the token level and are reserved for the more aggressive pipeline; the stopword list is pruned to keep negations (\texttt{no}, \texttt{not}, \texttt{nor}) and directional words (\texttt{up}, \texttt{down}, \texttt{over}, \texttt{under}) because they flip sentiment polarity.
+We split preprocessing into twelve standalone operations grouped by purpose (Table~\ref{tab:steps}). Surface cleanup (steps 1--4 and 7--10) standardises encoding, removes platform artefacts and folds case. Domain-specific normalisation (steps 5 and 6) replaces \$TICKER cashtags and numerical values with placeholders so the encoder sees a consistent rare-token pattern rather than overfitting to any specific ticker or figure. The remaining two operations act at the token level and are reserved for the more aggressive pipeline. The stopword list is pruned to keep negations (\texttt{no}, \texttt{not}, \texttt{nor}) and directional words (\texttt{up}, \texttt{down}, \texttt{over}, \texttt{under}) because they flip sentiment polarity.
 
 \begin{table}[!htbp]
 \centering
@@ -200,7 +200,7 @@ We split preprocessing into twelve standalone operations grouped by purpose (Tab
 
 \subsection{Named Pipelines}
 
-From these operations we built three named pipelines targeting different downstream models. \texttt{pp\_minimal} applies the first ten surface-level operations and is used for the bag-of-words and Word2Vec experiments. \texttt{pp\_aggressive} adds stopword removal and lemmatisation or stemming on top; it was kept for ablation purposes. \texttt{pp\_transformer} skips operations that would interfere with pretrained tokenizers (number replacement, case folding outside the tokenizer's own logic) and is used for the Transformer encoders (Table~\ref{tab:pipelines}).
+From these operations we built three named pipelines targeting different downstream models. \texttt{pp\_minimal} applies the first ten surface-level operations and is used for the bag-of-words and Word2Vec experiments. \texttt{pp\_aggressive} adds stopword removal and lemmatisation or stemming on top, kept for ablation. \texttt{pp\_transformer} skips operations that would interfere with pretrained tokenizers (number replacement, case folding outside the tokenizer's own logic) and is used for the Transformer encoders (Table~\ref{tab:pipelines}).
 
 \begin{table}[!htbp]
 \centering
@@ -219,7 +219,7 @@ From these operations we built three named pipelines targeting different downstr
 
 \subsection{Pipeline Comparison}
 
-To isolate the preprocessing effect we benchmarked the three pipelines under a single fixed classifier (Logistic Regression on TF-IDF features, Table~\ref{tab:pp_compare}). \texttt{pp\_minimal} consistently outperforms the aggressive variant by 1.8--2.7 percentage points, regardless of whether lemmatisation or stemming is used on top. The aggressive pipeline removes content that is informative for sentiment: stopword filtering drops negations such as ``not'' that flip the polarity of the rest of the sentence; lemmatisation collapses temporal distinctions like ``falling'' into ``fall'' that carry their own urgency; and the number-replacement step erases specific values (``\$50M loss'') that provide context the downstream classifier would otherwise pick up.
+To isolate the preprocessing effect we benchmarked the three pipelines under a single fixed classifier (Logistic Regression on TF-IDF features, Table~\ref{tab:pp_compare}). \texttt{pp\_minimal} consistently outperforms the aggressive variant by 1.8--2.7 percentage points, regardless of whether lemmatisation or stemming is used on top. The aggressive pipeline removes content that is informative for sentiment. Stopword filtering drops negations such as ``not'' that flip the polarity of the rest of the sentence. Lemmatisation collapses temporal distinctions like ``falling'' into ``fall'' that carry their own urgency. And the number-replacement step erases specific values (``\$50M loss'') that provide context the downstream classifier would otherwise pick up.
 
 \begin{table}[!htbp]
 \centering
@@ -256,7 +256,7 @@ The first family is the classical sparse representation. The bag-of-words varian
 
 \subsection{Word Embeddings}
 
-The second family is dense, mean-pooled token embeddings. We compared three variants: a skip-gram Word2Vec model with 100~dimensions trained from scratch on the financial-tweet corpus; the pretrained GloVe-Twitter-100 vectors, which were trained on two billion tweets; and a TF-IDF--weighted pooling scheme, which weights each token's embedding by its TF-IDF score before averaging, with the aim of down-weighting frequent function words.
+The second family is dense, mean-pooled token embeddings. We compared three variants. The first is a skip-gram Word2Vec model with 100~dimensions trained from scratch on the financial-tweet corpus. The second uses the pretrained GloVe-Twitter-100 vectors, which were trained on two billion tweets. The third is a TF-IDF--weighted pooling scheme that weights each token's embedding by its TF-IDF score before averaging, with the aim of down-weighting frequent function words.
 
 All three variants underperform the bag-of-words family (macro-F1 0.59--0.66 against 0.72--0.74). The reason is mean pooling, which collapses word order: averaged GloVe vectors for ``stock is going up today'' and ``stock is going down today'' have a cosine similarity of 0.996, despite carrying opposite financial polarity. No downstream classifier can recover information that the pooling step has discarded.
 
@@ -281,11 +281,11 @@ Twitter-RoBERTa  & Twitter + sentiment     & 125M & Extra work \\
 \label{tab:transformers}
 \end{table}
 
-Domain alignment turns out to matter more than parameter count. DistilBERT, despite its 66~million parameters, underperforms TF-IDF bigrams; Twitter-RoBERTa, at roughly twice the size, achieves the best overall result. FinBERT lands between the two: it understands financial vocabulary, but its pretraining text is formal SEC filings rather than informal tweets.
+Domain alignment turns out to matter more than parameter count. DistilBERT, despite its 66~million parameters, underperforms TF-IDF bigrams. Twitter-RoBERTa, at roughly twice the size, achieves the best overall result. FinBERT lands between the two: it understands financial vocabulary, but its pretraining text is formal SEC filings rather than informal tweets.
 
-A second observation concerns the tokenizer. All three encoders use subword vocabularies, so most financial vocabulary is fragmented at inference time. The word \texttt{bullish} becomes \texttt{bull|ish} and \texttt{downgrade} becomes \texttt{down|grade} for all three; \texttt{rebalancing} splits into four pieces for the BERT family but into three for RoBERTa. Our \texttt{<TICKER>} placeholder is itself split into several pieces, so the encoder never sees a holistic ``ticker'' token. What it does see is the same fragmentation pattern across every cashtag, which is the consistency the placeholder was meant to provide.
+A second observation concerns the tokenizer. All three encoders use subword vocabularies, so most financial vocabulary is fragmented at inference time. The word \texttt{bullish} becomes \texttt{bull|ish} and \texttt{downgrade} becomes \texttt{down|grade} for all three. \texttt{rebalancing} splits into four pieces for the BERT family but into three for RoBERTa. Our \texttt{<TICKER>} placeholder is itself split into several pieces, so the encoder never sees a single ``ticker'' token. What it does see is the same fragmentation pattern across every cashtag, which is the consistency the placeholder was meant to provide.
 
-Finally, we deviate from the standard BERT-family practice in our choice of sentence representation: the canonical choice is the \texttt{[CLS]} token's hidden state, but we use a mean pool over all non-padding tokens. To check that this is not a silent performance loss we recomputed the embeddings with \texttt{[CLS]} pooling and ran the same downstream XGBoost classifier (Table~\ref{tab:pooling}). For the two sentiment-tuned encoders the two pooling choices are within noise; mean pooling actually helps DistilBERT, whose \texttt{[CLS]} representation has not been adapted for sentiment.
+Finally, we deviate from the standard BERT-family practice in our choice of sentence representation: the canonical choice is the \texttt{[CLS]} token's hidden state, but we use a mean pool over all non-padding tokens. To check that this is not a silent performance loss we recomputed the embeddings with \texttt{[CLS]} pooling and ran the same downstream XGBoost classifier (Table~\ref{tab:pooling}). For the two sentiment-tuned encoders the two pooling choices are within noise, and mean pooling actually helps DistilBERT, whose \texttt{[CLS]} representation has not been adapted for sentiment.
 
 \begin{table}[!htbp]
 \centering
@@ -335,7 +335,7 @@ Random Forest       & 300 trees, balanced                & Ensemble baseline \\
 
 \subsection{Full Results Matrix}
 
-Table~\ref{tab:results} summarises macro-F1 across all 32~combinations: each row is one of the eight feature representations introduced in Section~\ref{sec:features}, each column is one of the four classifiers from Table~\ref{tab:classifiers}, and each cell is the mean and standard deviation across the five cross-validation folds. The best score per row is shown in bold and the overall best is underlined. Standard deviations stay below 0.017 throughout; the winning configuration carries one of the lowest ($\pm$0.006), so the ranking is stable across folds rather than being an artefact of a particular split.
+Table~\ref{tab:results} summarises macro-F1 across all 32~combinations: each row is one of the eight feature representations introduced in Section~\ref{sec:features}, each column is one of the four classifiers from Table~\ref{tab:classifiers}, and each cell is the mean and standard deviation across the five cross-validation folds. The best score per row is shown in bold and the overall best is underlined. Standard deviations stay below 0.017 throughout, and the winning configuration carries one of the lowest ($\pm$0.006), so the ranking is stable across folds rather than being an artefact of a particular split.
 
 \begin{table}[!htbp]
 \centering
@@ -360,7 +360,7 @@ Twitter-RoBERTa$^{*}$ & .755$\pm$.011 & .764$\pm$.008 & \underline{\textbf{.794$
 
 \subsection{Key Findings}
 
-Reading the matrix top to bottom by best score per row produces a clear feature hierarchy. Twitter-RoBERTa leads at 0.794 macro-F1, helped by sentiment-task pretraining on 58~million tweets. FinBERT comes second at 0.779: financial vocabulary helps, but the formal SEC-filings register is not an ideal match for tweets. TF-IDF bigrams reach 0.740 and are surprisingly competitive with the smaller Transformer; plain bag-of-words trails another two points behind at 0.720. DistilBERT, the general-purpose encoder, lands at 0.705 --- below TF-IDF bigrams, which is the most striking single result in the matrix and the clearest evidence that domain alignment matters more than encoder size. The Word2Vec variants sit at the bottom around 0.66, held there by the mean-pooling limitation discussed earlier.
+Reading the matrix top to bottom by best score per row produces a clear feature hierarchy. Twitter-RoBERTa leads at 0.794 macro-F1, helped by sentiment-task pretraining on 58~million tweets. FinBERT comes second at 0.779: financial vocabulary helps, but the formal SEC-filings register is not an ideal match for tweets. TF-IDF bigrams reach 0.740 and stay competitive with the smaller Transformer, while plain bag-of-words trails another two points behind at 0.720. DistilBERT, the general-purpose encoder, lands at 0.705. That score sits below TF-IDF bigrams, which is the clearest evidence in the matrix that domain alignment matters more than encoder size. The Word2Vec variants sit at the bottom around 0.66, held there by the mean-pooling limitation discussed earlier.
 
 The classifier dimension shows a complementary pattern. XGBoost dominates the dense Transformer rows, where non-linear decision boundaries in 768-d space pay off. Logistic regression and LinearSVC dominate the sparse rows, where their L2 regularisation handles the high dimensionality cleanly. Random Forest consistently lands last across both regimes.
 
@@ -384,7 +384,7 @@ Neutral is consistently the easiest class (F1\,$>$\,0.87) thanks to a large supp
 \label{fig:pca}
 \end{figure}
 
-To check whether the best encoder genuinely separates the three classes in feature space, we projected the 768-d Twitter-RoBERTa embeddings of the validation set to 2-d via PCA (Figure~\ref{fig:pca}). PC1 alone accounts for 26.7\% of variance and roughly tracks the Bearish\,$\leftrightarrow$\,Bullish axis; Neutral occupies the centre of the cloud, mirroring the dominant error mode in the confusion matrices (Neutral\,$\leftrightarrow$\,sentiment confusion). The clusters overlap but remain visibly distinct --- this is the geometry that XGBoost exploits to reach 0.79~macro-F1.
+To check whether the best encoder genuinely separates the three classes in feature space, we projected the 768-d Twitter-RoBERTa embeddings of the validation set to 2-d via PCA (Figure~\ref{fig:pca}). PC1 alone accounts for 26.7\% of variance and roughly tracks the Bearish\,$\leftrightarrow$\,Bullish axis. Neutral occupies the centre of the cloud, mirroring the dominant error mode in the confusion matrices (Neutral\,$\leftrightarrow$\,sentiment confusion). The clusters overlap but remain visibly distinct, which is the geometry XGBoost exploits to reach 0.79~macro-F1.
 
 \subsection{Error Analysis}
 
@@ -409,7 +409,7 @@ The dominant challenge across all three patterns is the fundamental ambiguity be
 
 \subsection{Learning Curve and Statistical Significance}
 
-The learning curve for the best configuration (Figure~\ref{fig:learning_curve}) plateaus after roughly 40\% of the training data, which suggests the model is near its ceiling for this feature representation. The persistent train--validation gap points to mild overfitting that more data alone will not resolve; closing it would require architectural changes, in particular full fine-tuning of the encoder rather than a frozen-feature setup.
+The learning curve for the best configuration (Figure~\ref{fig:learning_curve}) plateaus after roughly 40\% of the training data, which suggests the model is near its ceiling for this feature representation. The persistent train--validation gap points to mild overfitting that more data alone will not resolve. Closing it would require architectural changes, in particular full fine-tuning of the encoder rather than a frozen-feature setup.
 
 To confirm that the matrix ranking is statistically meaningful and not a fold-sampling artefact, we ran paired $t$-tests on the per-fold CV scores between the three best configurations. All three pairwise comparisons reach significance at $p < 0.05$, so the observed ranking is not produced by random fold variation.
 
@@ -526,8 +526,8 @@ First, the dominant factor in the matrix is the pretraining domain of the encode
 
 Second, feature extraction matters more than classifier choice. The gap between feature families (0.60--0.79~macro-F1) is roughly four times the gap between classifiers within the same family (0.02--0.05). Picking the right representation has by far the larger impact on this task.
 
-Third, conservative preprocessing wins. Removing stopwords strips negations like ``not'' that flip polarity; lemmatisation collapses temporal distinctions; number replacement erases context. Our minimal pipeline beats the aggressive variant by close to two percentage points. Explicit class-imbalance handling is similarly essential, since classifiers otherwise default to the dominant Neutral class.
+Third, conservative preprocessing wins. Removing stopwords strips negations like ``not'' that flip polarity, lemmatisation collapses temporal distinctions, and number replacement erases context. Our minimal pipeline beats the aggressive variant by close to two percentage points. Explicit class-imbalance handling is similarly essential, since classifiers otherwise default to the dominant Neutral class.
 
-The main limitation of this work is the CPU-only constraint, which blocked full Transformer fine-tuning; on Apple-Silicon MPS our frozen-encoder and few-shot decoder pipelines remained tractable, but full fine-tuning is what would be needed to close the remaining train--validation gap. GPU fine-tuning, cross-family ensembles and a temporal analysis of sentiment drift across market regimes are the natural next steps.
+The main limitation of this work is compute. Our frozen-encoder and few-shot decoder pipelines stayed tractable on a laptop, but full fine-tuning of the encoder is what would be needed to close the remaining train--validation gap. GPU fine-tuning, cross-family ensembles and a temporal analysis of sentiment drift across market regimes are the natural next steps.
 
 \end{document}
