@@ -81,7 +81,7 @@ takes ~35 min on MPS for Flan-T5-base.
 
 | Name | Student ID |
 |------|-----------|
-| TBD  | TBD       |
-| TBD  | TBD       |
-| TBD  | TBD       |
-| TBD  | TBD       |
+| Jan Luis Thier               | 20250352 |
+| Samuel Braun                 | 20250355 |
+| Lukas Belser                 | 20250338 |
+| Margarida Estrada Quintino   | 20250411 |
