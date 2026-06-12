@@ -1,9 +1,11 @@
 \documentclass[12pt,a4paper]{article}
 
-% ── Font: Arial (via helvet) ─────────────────────────────────────────────────
+% ── Font: professional LaTeX style (Latin Modern serif body, Latin Modern
+% sans for headings, Inconsolata for monospace) ──────────────────────────────
 \usepackage[T1]{fontenc}
-\usepackage{helvet}
-\renewcommand{\familydefault}{\sfdefault}
+\usepackage{lmodern}
+\usepackage{inconsolata}
+\usepackage{microtype}     % subtle kerning / line-break improvements
 
 % ── Layout ───────────────────────────────────────────────────────────────────
 \usepackage[margin=2.5cm, top=2.5cm, bottom=2.5cm]{geometry}
@@ -114,7 +116,7 @@ Financial sentiment is what hedge funds, market-surveillance teams and retail in
 
 We frame the problem as 3-class text classification: given a financial tweet, predict whether it expresses Bearish~(0), Bullish~(1) or Neutral~(2) sentiment. Our approach progresses from sparse bag-of-words representations through Word2Vec embeddings to frozen Transformer encoders, each combined with four standard classifiers, for a total of 32~feature\,$\times$\,classifier combinations evaluated under 5-fold stratified cross-validation. Each step is motivated by the limitations of the previous one.
 
-Our frozen-encoder configuration --- Twitter-RoBERTa embeddings combined with an XGBoost classifier --- reaches a macro-F1 of 0.794, with the substantial margin over traditional approaches driven primarily by domain-aligned pretraining (Section~\ref{sec:results}). Fully fine-tuning the encoder lifts this to 0.840, and an equal-weight probability ensemble of fully fine-tuned Twitter-RoBERTa and FinBERT reaches \textbf{0.842} (Section~\ref{sec:finetune}). The ensemble is our submitted pipeline.
+Our frozen-encoder configuration (Twitter-RoBERTa embeddings combined with an XGBoost classifier) reaches a macro-F1 of 0.794, with the substantial margin over traditional approaches driven primarily by domain-aligned pretraining (Section~\ref{sec:results}). Fully fine-tuning the encoder lifts this to 0.840, and an equal-weight probability ensemble of fully fine-tuned Twitter-RoBERTa and FinBERT reaches \textbf{0.842} (Section~\ref{sec:finetune}). The ensemble is our submitted pipeline.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Data Exploration}
@@ -138,7 +140,7 @@ Neutral (2) & 6,178 & 64.7\% \\
 \label{tab:class_dist}
 \end{table}
 
-Tweet lengths range from 2 to 48~tokens (median:~18), and all three classes share similar length distributions (Figure~\ref{fig:tweet_length}), so length itself is not discriminative. This also justifies our \texttt{max\_length=128} setting for the Transformer tokenizers --- no tweet approaches that limit.
+Tweet lengths range from 2 to 48~tokens (median:~18), and all three classes share similar length distributions (Figure~\ref{fig:tweet_length}), so length itself is not discriminative. This also justifies our \texttt{max\_length=128} setting for the Transformer tokenizers, since no tweet approaches that limit.
 
 \begin{figure}[!htbp]
 \centering
@@ -377,9 +379,9 @@ Neutral is consistently the easiest class (F1\,$>$\,0.87) thanks to a large supp
 
 \subsection{Error Analysis}
 
-The misclassified tweets cluster into three recurring patterns, all visible in the confusion matrices of Figure~\ref{fig:confusion}. The most common is the Neutral $\leftrightarrow$ Bearish boundary: tweets reporting negative news factually (``stock down 5\% after earnings miss'') are genuinely ambiguous between factual reporting and negative sentiment, and the dataset's annotations sometimes go one way and sometimes the other. The mirror-image Neutral $\leftrightarrow$ Bullish confusion arises from the same dynamic on positive news. Direct Bearish $\leftrightarrow$ Bullish swaps are rare and almost always involve sarcasm or contrarian positions, neither of which the encoder can resolve from text alone.
+The misclassified tweets cluster into three recurring patterns, all visible in the confusion matrices of Figure~\ref{fig:confusion}. The most common is the Neutral / Bearish boundary: tweets reporting negative news factually (``stock down 5\% after earnings miss'') are genuinely ambiguous between factual reporting and negative sentiment, and the dataset's annotations sometimes go one way and sometimes the other. The mirror-image Neutral / Bullish confusion arises from the same dynamic on positive news. Direct Bearish / Bullish swaps are rare and almost always involve sarcasm or contrarian positions, neither of which the encoder can resolve from text alone.
 
-The dominant challenge across all three patterns is the fundamental ambiguity between factual reporting and sentiment expression in financial discourse --- an annotation difficulty the dataset itself reflects, not a modelling artefact.
+The dominant challenge across all three patterns is the fundamental ambiguity between factual reporting and sentiment expression in financial discourse. That ambiguity sits in the dataset's annotations rather than in the model.
 
 \begin{figure}[H]
 \centering
@@ -410,12 +412,13 @@ To confirm that the matrix ranking is statistically meaningful and not a fold-sa
 \end{figure}
 
 \FloatBarrier
+\clearpage
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Extra Work}
 \label{sec:extra}
 % ══════════════════════════════════════════════════════════════════════════════
 
-This section collects four contributions that go beyond the mandatory rubric and are marked as EXTRA WORK in our test notebook \texttt{tm\_tests\_42.ipynb}: two additional pretrained encoders, a zero-shot baseline that bypasses the downstream classifier, a LangChain-based classification agent and an attempted decoder model.
+This section collects four contributions that go beyond the mandatory rubric, all marked EXTRA WORK in \texttt{tm\_tests\_42.ipynb}: two additional pretrained encoders, a zero-shot baseline, a LangChain-based classification agent and a decoder-LLM experiment.
 
 \subsection{Domain-Specific Transformer Encoders}
 
@@ -533,12 +536,102 @@ The prediction distribution closely matches the training proportions across all 
 
 Our evaluation of 32 feature-by-classifier combinations identifies Twitter-RoBERTa combined with XGBoost as the best frozen-encoder pipeline (0.794 macro-F1, 5-fold stratified CV). Fully fine-tuning Twitter-RoBERTa lifts this to 0.840 on the validation split, and a 50/50 probability ensemble with fully fine-tuned FinBERT reaches \textbf{0.842} (Section~\ref{sec:finetune}). The ensemble is what we submit. Three findings stand out.
 
-First, the dominant factor in the matrix is the pretraining domain of the encoder, not the parameter count. DistilBERT (66M params) underperforms TF-IDF bigrams while Twitter-RoBERTa (125M params) substantially exceeds both. Pretraining alignment alone is not enough either: the same Twitter-RoBERTa applied zero-shot reaches only 0.587 macro-F1 (Section~\ref{sec:zero_shot}), and the supervised head adds the remaining 0.21.
+First, the dominant factor in the matrix is the pretraining domain of the encoder, not the parameter count. DistilBERT (66M params) underperforms TF-IDF bigrams while Twitter-RoBERTa (125M params) substantially exceeds both. Pretraining alignment alone is not sufficient either: the same Twitter-RoBERTa applied zero-shot reaches only 0.587 macro-F1 (Section~\ref{sec:zero_shot}), and supervised fine-tuning is what closes the gap to 0.840.
 
 Second, feature extraction matters more than classifier choice. The gap between feature families (0.60--0.79~macro-F1) is roughly four times the gap between classifiers within the same family (0.02--0.05). Picking the right representation has by far the larger impact on this task.
 
-Third, conservative preprocessing wins. Removing stopwords strips negations like ``not'' that flip polarity, lemmatisation collapses temporal distinctions, and number replacement erases context. Our minimal pipeline beats the aggressive variant by close to two percentage points. Explicit class-imbalance handling is similarly essential, since classifiers otherwise default to the dominant Neutral class.
+Third, conservative preprocessing wins. Stopword removal strips polarity-flipping negations, lemmatisation collapses temporal cues, and number replacement erases context, so our minimal pipeline beats the aggressive variant by close to two points; class-imbalance handling is similarly essential. Remaining limitations are computational: MPS fine-tuning was tractable for two encoders but would not scale to larger decoder LLMs or DeBERTa-v3-large.
 
-The main limitation of this work is compute. Our frozen-encoder and few-shot decoder pipelines stayed tractable on a laptop, but full fine-tuning of the encoder is what would be needed to close the remaining train--validation gap. GPU fine-tuning, cross-family ensembles and a temporal analysis of sentiment drift across market regimes are the natural next steps.
+% ══════════════════════════════════════════════════════════════════════════════
+% Appendix: supporting figures and tables. Roman page numbering so the
+% appendix does not count toward the 15-page body limit. Figure and table
+% counters reset and use A.x numbering. Included in the TOC.
+% ══════════════════════════════════════════════════════════════════════════════
+\clearpage
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\renewcommand{\thefigure}{A.\arabic{figure}}
+\renewcommand{\thetable}{A.\arabic{table}}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+
+\appendix
+\addcontentsline{toc}{section}{Appendix}
+\section*{Appendix}
+
+\subsection*{A.1\quad Embedding geometry}
+We projected the 768-dimensional Twitter-RoBERTa embeddings of the validation set to two dimensions via PCA (Figure~\ref{fig:pca_app}). PC1 alone explains 26.7\% of variance and roughly tracks the Bearish/Bullish polarity axis; Neutral occupies the centre of the cloud. The three classes form overlapping but visibly distinct regions, which is the geometry the trained classifier exploits.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.70\textwidth]{pca_twitter_roberta.png}
+\caption{PCA projection of Twitter-RoBERTa embeddings on the validation set (768-d to 2-d).}
+\label{fig:pca_app}
+\end{figure}
+
+\subsection*{A.2\quad Confusion matrices for the remaining Transformer encoders}
+Figures~\ref{fig:cm_finbert_app} and~\ref{fig:cm_distilbert_app} complete the set of confusion matrices for the frozen-encoder configurations referenced in Section~6.5.
+
+\begin{figure}[!htbp]
+\centering
+\begin{subfigure}[t]{0.46\textwidth}
+    \includegraphics[width=\textwidth]{cm_finbert.png}
+    \caption{FinBERT + XGBoost.}
+    \label{fig:cm_finbert_app}
+\end{subfigure}
+\hfill
+\begin{subfigure}[t]{0.46\textwidth}
+    \includegraphics[width=\textwidth]{cm_distilbert.png}
+    \caption{DistilBERT + SVM.}
+    \label{fig:cm_distilbert_app}
+\end{subfigure}
+\caption{Confusion matrices for FinBERT and DistilBERT, complementing Figure~6 in the body.}
+\label{fig:confusion_app}
+\end{figure}
+
+\subsection*{A.3\quad Fine-tuning hyperparameters}
+Table~\ref{tab:hyperparams_app} consolidates the training hyperparameters used for the three fine-tuned configurations in Section~7.5.
+
+\begin{table}[!htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Hyperparameter} & \textbf{Last-2-layer FT} & \textbf{Full FT RoBERTa} & \textbf{Full FT FinBERT} \\
+\midrule
+Trainable parameters       & 14.8M / 124.6M    & 124.6M (all)      & 109.5M (all) \\
+Epochs                     & 4                 & 3                 & 3 \\
+Batch size                 & 16                & 16                & 16 \\
+Learning rate              & $2\!\times\!10^{-5}$ & $1\!\times\!10^{-5}$ & $1\!\times\!10^{-5}$ \\
+Weight decay               & 0.01              & 0.01              & 0.01 \\
+Warmup ratio               & 0.1               & 0.1               & 0.1 \\
+Optimiser                  & AdamW             & AdamW             & AdamW \\
+Maximum sequence length    & 128               & 128               & 128 \\
+\bottomrule
+\end{tabular}
+\caption{Training hyperparameters for the fine-tuned configurations.}
+\label{tab:hyperparams_app}
+\end{table}
+
+\subsection*{A.4\quad Per-fold cross-validation scores}
+Table~\ref{tab:cv_app} reports the per-fold macro-F1 scores that produce the means and standard deviations in Table~3 of the body, for the three configurations whose pairwise differences are statistically significant (Section~6.6).
+
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Configuration} & \textbf{F1} & \textbf{F2} & \textbf{F3} & \textbf{F4} & \textbf{F5} & \textbf{Mean} & \textbf{Std} \\
+\midrule
+Twitter-RoBERTa + XGBoost  & .788 & .793 & .800 & .795 & .793 & \textbf{.794} & .006 \\
+FinBERT + XGBoost          & .777 & .779 & .783 & .777 & .779 & .779          & .003 \\
+TF-IDF + SVM               & .728 & .735 & .755 & .740 & .742 & .740          & .013 \\
+\bottomrule
+\end{tabular}
+\caption{Per-fold macro-F1 (rounded to three decimals) for the three top-ranked frozen-encoder configurations.}
+\label{tab:cv_app}
+\end{table}
 
 \end{document}
