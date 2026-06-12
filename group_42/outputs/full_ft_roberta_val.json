@@ -1,0 +1,9 @@
+{
+  "encoder": "ROBERTA",
+  "checkpoint": "cardiffnlp/twitter-roberta-base-sentiment-latest",
+  "val_macro_f1": 0.8398156235171861,
+  "val_accuracy": 0.8711367207962284,
+  "previous_best": 0.806,
+  "delta": 0.03381562351718603,
+  "verdict": "WORTH IT"
+}

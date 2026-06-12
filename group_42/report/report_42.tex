@@ -114,7 +114,7 @@ Financial sentiment is what hedge funds, market-surveillance teams and retail in
 
 We frame the problem as 3-class text classification: given a financial tweet, predict whether it expresses Bearish~(0), Bullish~(1) or Neutral~(2) sentiment. Our approach progresses from sparse bag-of-words representations through Word2Vec embeddings to frozen Transformer encoders, each combined with four standard classifiers, for a total of 32~feature\,$\times$\,classifier combinations evaluated under 5-fold stratified cross-validation. Each step is motivated by the limitations of the previous one.
 
-Our frozen-encoder configuration --- Twitter-RoBERTa embeddings combined with an XGBoost classifier --- reaches a macro-F1 of 0.794, with the substantial margin over traditional approaches driven primarily by domain-aligned pretraining (Section~\ref{sec:results}). Unfreezing the top two encoder layers and the classification head adds a further 1.2 percentage points to \textbf{0.806} (Section~\ref{sec:finetune}), and this is the configuration we submit for prediction.
+Our frozen-encoder configuration --- Twitter-RoBERTa embeddings combined with an XGBoost classifier --- reaches a macro-F1 of 0.794, with the substantial margin over traditional approaches driven primarily by domain-aligned pretraining (Section~\ref{sec:results}). Fully fine-tuning the encoder lifts this to 0.840, and an equal-weight probability ensemble of fully fine-tuned Twitter-RoBERTa and FinBERT reaches \textbf{0.842} (Section~\ref{sec:finetune}). The ensemble is our submitted pipeline.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Data Exploration}
@@ -452,24 +452,25 @@ To demonstrate how the trained models can be composed into a higher-level decisi
 
 In the routing scenario, the input ``\$AAPL all-time high, breakout above resistance.'' triggers the agent to detect a \$TICKER, route the request to FinBERT and return Bullish at 89.1\% confidence. In the ensemble scenario, the input ``Markets mixed; Fed signals rate changes amid inflation concerns.'' produces a split vote: TF-IDF/LogReg, FinBERT and Twitter-RoBERTa each return Neutral, while DistilBERT returns Bearish. The agent reconciles this to Neutral with 75\% agreement and flags the DistilBERT vote as an example of how a general-purpose encoder can over-weight non-financial sentiment cues such as ``concerns''. In the attribution scenario, the input ``Sell everything, this stock is going to crash hard.'' triggers the explanation tool, which extracts the largest LogReg coefficients: ``sell'' ($+2.85$) and ``crash'' ($+2.63$) are the strongest Bearish signals, and the same tokens carry negative Bullish weights of $-1.92$ and $-2.10$ respectively, actively pushing the prediction away from the positive class.
 
-\subsection{Last-Two-Layer Fine-tuning}
+\subsection{Full Fine-tuning and Ensemble}
 \label{sec:finetune}
 
-The frozen-encoder + XGBoost configuration treats the encoder as a fixed feature extractor, which leaves the encoder--classifier boundary unoptimised. To estimate the size of that gap we unfroze the top two transformer layers of Twitter-RoBERTa together with the classification head (14.8M trainable parameters out of 124.6M, roughly 12\%) and fine-tuned for four epochs on the same 80/20 stratified split (AdamW, learning rate $2\mathrm{e}{-5}$, batch size 16, weight decay 0.01, warmup ratio 0.1). The bottom ten encoder layers remain frozen.
-
-Validation macro-F1 rises from 0.794 to \textbf{0.806} (+0.012), with consistent gains across all three classes: Bearish F1 0.74, Bullish 0.78, Neutral 0.90 (Table~\ref{tab:finetune}). The improvement is small in absolute terms but real --- the same configuration retrained on the full 9,543~labelled tweets generates the final \texttt{pred\_42.csv} described in Section~\ref{sec:final}.
+The frozen-encoder + XGBoost configuration leaves the encoder--classifier boundary unoptimised. We progressively unfroze more of Twitter-RoBERTa and observed the lift on the validation split (Table~\ref{tab:finetune}). Unfreezing only the top two layers and the head (12\% of parameters trainable, 4 epochs, LR $2\mathrm{e}{-5}$) lifts macro-F1 from 0.794 to 0.806. Fully unfreezing the encoder (3 epochs, LR $1\mathrm{e}{-5}$, AdamW, warmup ratio 0.1, weight decay 0.01) lifts it further to 0.840, with consistent per-class gains: Bearish F1 0.80, Bullish 0.81, Neutral 0.91. Applying the same recipe to FinBERT yields 0.803, weaker than RoBERTa, but the two models disagree on 12.7\% of validation tweets, and a 50/50 average of their softmax probabilities reaches \textbf{0.842}. Both component models are retrained on the full 9\,543~labelled tweets to generate the submitted \texttt{pred\_42.csv} (Section~\ref{sec:final}).
 
 \begin{table}[!htbp]
 \centering
 \begin{tabular}{lr}
 \toprule
-\textbf{Twitter-RoBERTa configuration} & \textbf{Macro-F1} \\
+\textbf{Configuration} & \textbf{Macro-F1} \\
 \midrule
-Frozen embeddings + XGBoost             & 0.794 \\
-Last-2-layer fine-tune + head           & \textbf{0.806} \\
+Frozen Twitter-RoBERTa embeddings + XGBoost                 & 0.794 \\
+Last-2-layer fine-tuned Twitter-RoBERTa + head              & 0.806 \\
+Fully fine-tuned FinBERT                                    & 0.803 \\
+Fully fine-tuned Twitter-RoBERTa                            & 0.840 \\
+50/50 probability average (RoBERTa + FinBERT, ours)         & \textbf{0.842} \\
 \bottomrule
 \end{tabular}
-\caption{Frozen vs.\ partially fine-tuned Twitter-RoBERTa on the validation split.}
+\caption{Progression from the frozen-encoder baseline to the submitted ensemble on the validation split.}
 \label{tab:finetune}
 \end{table}
 
@@ -506,7 +507,7 @@ Twitter-RoBERTa + XGBoost (ours, best overall)          & \textbf{0.794} \\
 \label{sec:final}
 % ══════════════════════════════════════════════════════════════════════════════
 
-The production pipeline (\texttt{tm\_final\_42.ipynb}) retrains the partially fine-tuned Twitter-RoBERTa model of Section~\ref{sec:finetune} on the full 9\,543~labelled tweets and generates predictions for all 2\,388~test tweets. The steps are: (i)~preprocess with \texttt{pp\_transformer}; (ii)~load Twitter-RoBERTa with the top two encoder layers and the classification head trainable; (iii)~fine-tune for four epochs on the full set (AdamW, $\mathrm{LR}{=}2\mathrm{e}{-5}$, batch~16); (iv)~predict on the test rows~$\rightarrow$~\texttt{pred\_42.csv}.
+The production pipeline (\texttt{tm\_final\_42.ipynb}) retrains the ensemble of Section~\ref{sec:finetune} on the full 9\,543~labelled tweets and generates predictions for all 2\,388~test tweets. The steps are: (i)~preprocess with \texttt{pp\_transformer}; (ii)~fully fine-tune Twitter-RoBERTa for 3 epochs (AdamW, $\mathrm{LR}{=}1\mathrm{e}{-5}$, batch~16) and save its softmax probabilities on the test set; (iii)~repeat with FinBERT; (iv)~average the two probability tensors and take the argmax~$\rightarrow$~\texttt{pred\_42.csv}.
 
 \begin{table}[!htbp]
 \centering
@@ -514,23 +515,23 @@ The production pipeline (\texttt{tm\_final\_42.ipynb}) retrains the partially fi
 \toprule
 \textbf{Class} & \textbf{Pred.\ count} & \textbf{Pred.\ \%} & \textbf{Train \%} \\
 \midrule
-Bearish & 382   & 16.0\% & 15.1\% \\
-Bullish & 481   & 20.1\% & 20.1\% \\
-Neutral & 1\,525 & 63.9\% & 64.7\% \\
+Bearish & 359   & 15.0\% & 15.1\% \\
+Bullish & 491   & 20.6\% & 20.1\% \\
+Neutral & 1\,538 & 64.4\% & 64.7\% \\
 \bottomrule
 \end{tabular}
 \caption{Test-set prediction distribution vs.\ training proportions.}
 \label{tab:final_pred}
 \end{table}
 
-The prediction distribution closely matches the training proportions, indicating that the model is neither over- nor under-predicting any class.
+The prediction distribution closely matches the training proportions across all three classes (within 0.6 percentage points), suggesting the ensemble is well-calibrated relative to the class priors observed in training.
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Conclusion}
 \label{sec:conclusion}
 % ══════════════════════════════════════════════════════════════════════════════
 
-Our evaluation of 32 feature-by-classifier combinations identifies Twitter-RoBERTa combined with XGBoost as the best frozen-encoder pipeline (0.794 macro-F1, 5-fold stratified CV). Unfreezing the top two encoder layers together with the classification head and fine-tuning for four epochs lifts the validation macro-F1 to \textbf{0.806} (Section~\ref{sec:finetune}), and this is the configuration we submit. Three findings stand out.
+Our evaluation of 32 feature-by-classifier combinations identifies Twitter-RoBERTa combined with XGBoost as the best frozen-encoder pipeline (0.794 macro-F1, 5-fold stratified CV). Fully fine-tuning Twitter-RoBERTa lifts this to 0.840 on the validation split, and a 50/50 probability ensemble with fully fine-tuned FinBERT reaches \textbf{0.842} (Section~\ref{sec:finetune}). The ensemble is what we submit. Three findings stand out.
 
 First, the dominant factor in the matrix is the pretraining domain of the encoder, not the parameter count. DistilBERT (66M params) underperforms TF-IDF bigrams while Twitter-RoBERTa (125M params) substantially exceeds both. Pretraining alignment alone is not enough either: the same Twitter-RoBERTa applied zero-shot reaches only 0.587 macro-F1 (Section~\ref{sec:zero_shot}), and the supervised head adds the remaining 0.21.
 

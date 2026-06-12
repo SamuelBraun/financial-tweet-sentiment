@@ -1,0 +1,9 @@
+{
+  "encoder": "FINBERT",
+  "checkpoint": "ProsusAI/finbert",
+  "val_macro_f1": 0.8033003324347329,
+  "val_accuracy": 0.8543740178103719,
+  "previous_best": 0.779,
+  "delta": 0.02430033243473284,
+  "verdict": "WORTH IT"
+}
