@@ -1,0 +1,7 @@
+{
+  "val_macro_f1": 0.8058708358896357,
+  "val_accuracy": 0.8491356731272918,
+  "baseline_frozen": 0.794,
+  "delta": 0.011870835889635667,
+  "verdict": "MARGINAL"
+}
