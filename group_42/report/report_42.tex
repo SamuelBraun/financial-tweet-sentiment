@@ -173,7 +173,7 @@ Preprocessing was implemented as a set of composable functions in \texttt{src/pr
 
 \subsection{Cleaning Operations}
 
-We split preprocessing into twelve standalone operations grouped by purpose (Table~\ref{tab:steps}). Surface cleanup (steps 1--4 and 7--10) standardises encoding, removes platform artefacts and folds case. Domain-specific normalisation (steps 5 and 6) replaces \$TICKER cashtags and numerical values with placeholders so the encoder sees a consistent rare-token pattern rather than overfitting to any specific ticker or figure. The remaining two operations act at the token level and are reserved for the more aggressive pipeline. The stopword list is pruned to keep negations (\texttt{no}, \texttt{not}, \texttt{nor}) and directional words (\texttt{up}, \texttt{down}, \texttt{over}, \texttt{under}) because they flip sentiment polarity.
+We split preprocessing into twelve standalone operations grouped by purpose (Table~\ref{tab:steps}). Surface cleanup (steps 1--4 and 7--10) standardises encoding, removes platform artefacts and folds case. Step 5 replaces \$TICKER cashtags with a placeholder so the encoder sees a consistent rare-token pattern rather than overfitting to specific stock names; it is included in every pipeline. Step 6 (number placeholders) and the two token-level operations (11--12) are reserved for the more aggressive variant, where their effect on downstream macro-F1 is measured directly. The stopword list is pruned to keep negations (\texttt{no}, \texttt{not}, \texttt{nor}) and directional words (\texttt{up}, \texttt{down}, \texttt{over}, \texttt{under}) because they flip sentiment polarity.
 
 \begin{table}[!htbp]
 \centering
@@ -202,7 +202,7 @@ We split preprocessing into twelve standalone operations grouped by purpose (Tab
 
 \subsection{Named Pipelines}
 
-From these operations we built three named pipelines targeting different downstream models. \texttt{pp\_minimal} applies the first ten surface-level operations and is used for the bag-of-words and Word2Vec experiments. \texttt{pp\_aggressive} adds stopword removal and lemmatisation or stemming on top, kept for ablation. \texttt{pp\_transformer} skips operations that would interfere with pretrained tokenizers (number replacement, case folding outside the tokenizer's own logic) and is used for the Transformer encoders (Table~\ref{tab:pipelines}).
+From these operations we built three named pipelines targeting different downstream models. \texttt{pp\_minimal} applies the surface-level operations (1--5 and 7--10) and is used for the bag-of-words and Word2Vec experiments. \texttt{pp\_aggressive} adds number replacement, stopword removal and lemmatisation or stemming on top, and is kept for ablation. \texttt{pp\_transformer} drops the steps that would interfere with the pretrained tokenizer (number replacement, Unicode normalisation, lowercasing) and is used for the Transformer encoders (Table~\ref{tab:pipelines}).
 
 \begin{table}[!htbp]
 \centering
@@ -210,9 +210,9 @@ From these operations we built three named pipelines targeting different downstr
 \toprule
 \textbf{Pipeline} & \textbf{Steps} & \textbf{Use case} \\
 \midrule
-\texttt{pp\_minimal}     & 1--10     & BoW, TF-IDF, Word2Vec \\
-\texttt{pp\_aggressive}  & 1--12     & Ablation only \\
-\texttt{pp\_transformer} & 1--7, 10  & Transformer encoders \\
+\texttt{pp\_minimal}     & 1--5, 7--10 & BoW, TF-IDF, Word2Vec \\
+\texttt{pp\_aggressive}  & 1--12       & Ablation only \\
+\texttt{pp\_transformer} & 1--5, 7, 10 & Transformer encoders \\
 \bottomrule
 \end{tabular}
 \caption{The three named pipelines and their target use cases.}
@@ -221,7 +221,7 @@ From these operations we built three named pipelines targeting different downstr
 
 \subsection{Pipeline Comparison}
 
-To isolate the preprocessing effect we benchmarked the three pipelines under a single fixed classifier (Logistic Regression on TF-IDF features, Table~\ref{tab:pp_compare}). \texttt{pp\_minimal} consistently outperforms the aggressive variant by 1.8--2.7 percentage points, regardless of whether lemmatisation or stemming is used on top. The aggressive pipeline removes content that is informative for sentiment. Stopword filtering drops negations such as ``not'' that flip the polarity of the rest of the sentence. Lemmatisation collapses temporal distinctions like ``falling'' into ``fall'' that carry their own urgency. And the number-replacement step erases specific values (``\$50M loss'') that provide context the downstream classifier would otherwise pick up.
+To isolate the preprocessing effect we benchmarked the three pipelines under a single fixed classifier (Logistic Regression on TF-IDF features, Table~\ref{tab:pp_compare}). The three variants land within a single percentage point of each other on the 80/20 stratified validation split, so preprocessing choice is a second-order knob on this task: our finance-aware stopword list already preserves polarity-flipping tokens, leaving little for the aggressive pipeline to gain or lose. We keep \texttt{pp\_minimal} as the bag-of-words/Word2Vec default because (i)~its tokens remain human-readable for the top-feature analysis in Section~\ref{sec:features}, and (ii)~stemming collapses ``falling''~/~``fell'' into the same form, which masks the temporal nuance the downstream model would otherwise pick up.
 
 \begin{table}[!htbp]
 \centering
@@ -229,9 +229,9 @@ To isolate the preprocessing effect we benchmarked the three pipelines under a s
 \toprule
 \textbf{Pipeline} & \textbf{Macro-F1} \\
 \midrule
-\texttt{pp\_minimal}              & \textbf{0.736} \\
-\texttt{pp\_aggressive} (lemma)   & 0.718 \\
-\texttt{pp\_aggressive} (stem)    & 0.709 \\
+\texttt{pp\_minimal}              & 0.748 \\
+\texttt{pp\_aggressive} (lemma)   & 0.738 \\
+\texttt{pp\_aggressive} (stem)    & \textbf{0.750} \\
 \bottomrule
 \end{tabular}
 \caption{Preprocessing-pipeline comparison (LogReg\,+\,TF-IDF baseline).}
@@ -540,7 +540,7 @@ First, the dominant factor in the matrix is the pretraining domain of the encode
 
 Second, feature extraction matters more than classifier choice. The gap between feature families (0.60--0.79~macro-F1) is roughly four times the gap between classifiers within the same family (0.02--0.05). Picking the right representation has by far the larger impact on this task.
 
-Third, conservative preprocessing wins. Stopword removal strips polarity-flipping negations, lemmatisation collapses temporal cues, and number replacement erases context, so our minimal pipeline beats the aggressive variant by close to two points; class-imbalance handling is similarly essential. Remaining limitations are computational: MPS fine-tuning was tractable for two encoders but would not scale to larger decoder LLMs or DeBERTa-v3-large.
+Third, preprocessing is a second-order knob on this task. Once the finance-aware stopword list preserves the polarity-flipping tokens, the three pipelines land within a single percentage point of each other; explicit class-imbalance handling matters considerably more. Remaining limitations are computational: MPS fine-tuning was tractable for two encoders but would not scale to larger decoder LLMs or DeBERTa-v3-large.
 
 % ══════════════════════════════════════════════════════════════════════════════
 % Appendix: supporting figures and tables. Roman page numbering so the
