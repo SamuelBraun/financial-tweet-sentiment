@@ -132,7 +132,7 @@ The dataset comprises 9,543~labeled training tweets and 2,388~unlabeled test twe
 \textbf{Class} & \textbf{Count} & \textbf{Proportion} \\
 \midrule
 Bearish (0) & 1,442 & 15.1\% \\
-Bullish (1) & 1,923 & 20.1\% \\
+Bullish (1) & 1,923 & 20.2\% \\
 Neutral (2) & 6,178 & 64.7\% \\
 \bottomrule
 \end{tabular}
@@ -519,7 +519,7 @@ The production pipeline (\texttt{tm\_final\_42.ipynb}) retrains the ensemble of 
 \textbf{Class} & \textbf{Pred.\ count} & \textbf{Pred.\ \%} & \textbf{Train \%} \\
 \midrule
 Bearish & 359   & 15.0\% & 15.1\% \\
-Bullish & 491   & 20.6\% & 20.1\% \\
+Bullish & 491   & 20.6\% & 20.2\% \\
 Neutral & 1\,538 & 64.4\% & 64.7\% \\
 \bottomrule
 \end{tabular}
@@ -571,7 +571,7 @@ We projected the 768-dimensional Twitter-RoBERTa embeddings of the validation se
 \end{figure}
 
 \subsection*{A.2\quad Confusion matrices for the remaining Transformer encoders}
-Figures~\ref{fig:cm_finbert_app} and~\ref{fig:cm_distilbert_app} complete the set of confusion matrices for the frozen-encoder configurations referenced in Section~6.5.
+Figures~\ref{fig:cm_finbert_app} and~\ref{fig:cm_distilbert_app} complete the set of confusion matrices for the frozen-encoder configurations referenced in Section~6.4.
 
 \begin{figure}[!htbp]
 \centering
@@ -591,7 +591,7 @@ Figures~\ref{fig:cm_finbert_app} and~\ref{fig:cm_distilbert_app} complete the se
 \end{figure}
 
 \subsection*{A.3\quad Fine-tuning hyperparameters}
-Table~\ref{tab:hyperparams_app} consolidates the training hyperparameters used for the three fine-tuned configurations in Section~7.5.
+Table~\ref{tab:hyperparams_app} consolidates the training hyperparameters used for the three fine-tuned configurations in Section~7.4.
 
 \begin{table}[!htbp]
 \centering
@@ -616,7 +616,7 @@ Maximum sequence length    & 128               & 128               & 128 \\
 \end{table}
 
 \subsection*{A.4\quad Per-fold cross-validation scores}
-Table~\ref{tab:cv_app} reports the per-fold macro-F1 scores that produce the means and standard deviations in Table~3 of the body, for the three configurations whose pairwise differences are statistically significant (Section~6.6).
+Table~\ref{tab:cv_app} reports the per-fold macro-F1 scores that produce the means and standard deviations in Table~3 of the body, for the three configurations whose pairwise differences are statistically significant (Section~6.5).
 
 \begin{table}[!htbp]
 \centering
