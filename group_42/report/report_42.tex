@@ -140,7 +140,7 @@ Neutral (2) & 6,178 & 64.7\% \\
 \label{tab:class_dist}
 \end{table}
 
-Tweet lengths range from 2 to 48~tokens (median:~18), and all three classes share similar length distributions (Figure~\ref{fig:tweet_length}), so length itself is not discriminative. This also justifies our \texttt{max\_length=128} setting for the Transformer tokenizers, since no tweet approaches that limit.
+Tweet lengths range from 1 to 32~whitespace words (median:~11), or 7--83 BPE subwords (median:~23) under the Twitter-RoBERTa tokenizer, and all three classes share similar length distributions (Figure~\ref{fig:tweet_length}), so length itself is not discriminative. This justifies our \texttt{max\_length=128} setting for the Transformer tokenizers, since no tweet approaches that limit.
 
 \begin{figure}[!htbp]
 \centering
@@ -149,7 +149,9 @@ Tweet lengths range from 2 to 48~tokens (median:~18), and all three classes shar
 \label{fig:tweet_length}
 \end{figure}
 
-Financial tweets carry distinctive surface markers: \$TICKER cashtags appear in ${\sim}$60\% of tweets, @mentions in ${\sim}$15\% and URLs in ${\sim}$20\%. Cashtags carry real contextual signal, but overfitting to specific tickers would not generalise, so we replace them with a \texttt{<TICKER>} placeholder.
+\begin{sloppypar}
+Financial tweets carry distinctive surface markers: URLs appear in 47\% of tweets, \$TICKER cashtags in 15\% and @mentions in 3\%. Cashtags carry real contextual signal but overfitting to specific tickers would not generalise, so we replace them with a placeholder; URLs are stripped because the linked content is unavailable at training time, and mentions are removed since they identify accounts rather than sentiment.
+\end{sloppypar}
 
 Analysis of the most frequent tokens per class (Figure~\ref{fig:vocab}) reveals clear thematic separation: Bearish tweets feature words such as ``cut'', ``downgrade'' and ``sell''; Bullish tweets contain ``buy'', ``upgrade'' and ``breakout''; Neutral tweets use informational vocabulary (``earnings'', ``report'', ``market'') that overlaps with both sentiment classes, making the Neutral boundaries the primary source of classification error.
 
@@ -160,7 +162,9 @@ Analysis of the most frequent tokens per class (Figure~\ref{fig:vocab}) reveals 
 \label{fig:vocab}
 \end{figure}
 
-Data-quality checks found fewer than 1\% exact duplicates (retained, to avoid biasing the class proportions) and no label leakage: ``bearish'' and ``bullish'' appear naturally in financial discourse and represent legitimate patterns rather than annotation shortcuts.
+\begin{sloppypar}
+Data-quality checks found no exact duplicates and only six near-duplicates under case+whitespace normalisation, which we retain to avoid biasing class proportions. The tokens ``bearish'' and ``bullish'' appear naturally in financial discourse and represent legitimate patterns rather than annotation shortcuts.
+\end{sloppypar}
 
 % ══════════════════════════════════════════════════════════════════════════════
 \section{Data Preprocessing}
@@ -247,7 +251,7 @@ We implemented and compared eight feature-extraction methods across three famili
 
 \subsection{Bag-of-Words Features}
 
-The first family is the classical sparse representation. The bag-of-words variant uses scikit-learn's \texttt{CountVectorizer} with a 10\,000-feature unigram vocabulary. TF-IDF extends this to bigrams (\texttt{ngram\_range=(1,2)}) with sublinear term-frequency scaling, a vocabulary of up to 20\,000 features and the usual document-frequency cuts (\texttt{min\_df=2}, \texttt{max\_df=0.95}). TF-IDF outperforms BoW by one to three percentage points across every classifier in our comparison (Section~\ref{sec:results}), which confirms that bigrams recover some of the local word order that unigram counts throw away. The top weighted features per class (Figure~\ref{fig:tfidf}) are coherent with the discriminative vocabulary identified in Section~\ref{sec:data}.
+The first family is the classical sparse representation. The bag-of-words variant uses scikit-learn's \texttt{CountVectorizer} with a 10\,000-feature unigram vocabulary. TF-IDF extends this to bigrams (\texttt{ngram\_range=(1,2)}) with sublinear term-frequency scaling, a vocabulary of up to 20\,000 features and the usual document-frequency cuts (\texttt{min\_df=2}, \texttt{max\_df=0.95}). For the linear classifiers (LogReg, SVM) TF-IDF outperforms BoW by 1.6--3.2 percentage points, since bigrams recover local word order and the IDF reweighting suppresses generic finance vocabulary. For the tree-based classifiers (XGBoost, RandomForest) the order flips, with BoW winning by 1.1--2.1~points: tree splits exploit raw counts directly and the 20\,000-feature TF-IDF matrix is sparser per tree node. The best BoW/TF-IDF cell overall (TF-IDF + SVM, 0.740) defines the strongest non-Transformer baseline. The top weighted features per class (Figure~\ref{fig:tfidf}) are coherent with the discriminative vocabulary identified in Section~\ref{sec:data}.
 
 \begin{figure}[!htbp]
 \centering
@@ -266,7 +270,7 @@ All three variants underperform the bag-of-words family (macro-F1 0.59--0.66 aga
 
 The third family is pretrained Transformer encoders used as frozen feature extractors. Each tweet is tokenised, passed through the encoder, and the last hidden states are mean-pooled (with attention masking applied to the padding positions) into a fixed 768-dimensional vector that is then handed to a scikit-learn classifier. Embeddings are cached on disk as \texttt{.npy} files, which makes the whole workflow CPU-feasible despite the size of the encoders.
 
-The three encoders we use differ mainly in their pretraining domain (Table~\ref{tab:transformers}). DistilBERT is a general-purpose distilled BERT trained on Wikipedia and BookCorpus. FinBERT was pretrained on SEC filings and other financial communications. Twitter-RoBERTa was pretrained on 58~million tweets with sentiment labels, giving it both Twitter-domain coverage and sentiment-task awareness.
+The three encoders we use differ mainly in their pretraining domain (Table~\ref{tab:transformers}). DistilBERT is a general-purpose distilled BERT trained on Wikipedia and BookCorpus. FinBERT was pretrained on SEC filings and other financial communications. Twitter-RoBERTa was pretrained on a large multi-year tweet corpus and further fine-tuned on the TweetEval sentiment benchmark, giving it both Twitter-domain coverage and sentiment-task awareness.
 
 \begin{table}[!htbp]
 \centering
@@ -362,7 +366,7 @@ Twitter-RoBERTa$^{*}$ & .755$\pm$.011 & .764$\pm$.008 & \underline{\textbf{.794$
 
 \subsection{Key Findings}
 
-Reading the matrix top to bottom by best score per row produces a clear feature hierarchy. Twitter-RoBERTa leads at 0.794 macro-F1, helped by sentiment-task pretraining on 58~million tweets. FinBERT comes second at 0.779: financial vocabulary helps, but the formal SEC-filings register is not an ideal match for tweets. TF-IDF bigrams reach 0.740 and stay competitive with the smaller Transformer, while plain bag-of-words trails another two points behind at 0.720. DistilBERT, the general-purpose encoder, lands at 0.705. That score sits below TF-IDF bigrams, which is the clearest evidence in the matrix that domain alignment matters more than encoder size. The Word2Vec variants sit at the bottom around 0.66, held there by the mean-pooling limitation discussed earlier.
+Reading the matrix top to bottom by best score per row produces a clear feature hierarchy. Twitter-RoBERTa leads at 0.794 macro-F1, helped by its sentiment-task fine-tuning on a large Twitter corpus. FinBERT comes second at 0.779: financial vocabulary helps, but the formal SEC-filings register is not an ideal match for tweets. TF-IDF bigrams reach 0.740 and stay competitive with the smaller Transformer, while plain bag-of-words trails another two points behind at 0.720. DistilBERT, the general-purpose encoder, lands at 0.705. That score sits below TF-IDF bigrams, which is the clearest evidence in the matrix that domain alignment matters more than encoder size. The Word2Vec variants sit at the bottom around 0.66, held there by the mean-pooling limitation discussed earlier.
 
 The classifier dimension shows a complementary pattern. XGBoost dominates the dense Transformer rows, where non-linear decision boundaries in 768-d space pay off. Logistic regression and LinearSVC dominate the sparse rows, where their L2 regularisation handles the high dimensionality cleanly. Random Forest consistently lands last across both regimes.
 
@@ -423,7 +427,7 @@ This section collects four contributions that go beyond the mandatory rubric, al
 \subsection{Domain-Specific Transformer Encoders}
 
 \begin{sloppypar}
-Beyond the mandatory DistilBERT, we evaluated two further pretrained encoders. FinBERT,\footnote{Hugging Face checkpoint \texttt{ProsusAI/finbert}.} pretrained on financial communications, reaches 0.779~macro-F1, a 7.4 percentage-point improvement over DistilBERT. Twitter-RoBERTa,\footnote{Hugging Face checkpoint \texttt{cardiffnlp/\allowbreak twitter-\allowbreak roberta-\allowbreak base-\allowbreak sentiment-\allowbreak latest}.} pretrained on 58~million tweets annotated with sentiment labels, reaches 0.794~macro-F1 and is the best configuration we tested. Both gains come almost entirely from the pretraining domain rather than from any architectural advantage over DistilBERT.
+Beyond the mandatory DistilBERT, we evaluated two further pretrained encoders. FinBERT,\footnote{Hugging Face checkpoint \texttt{ProsusAI/finbert}.} pretrained on financial communications, reaches 0.779~macro-F1, a 7.4 percentage-point improvement over DistilBERT. Twitter-RoBERTa,\footnote{Hugging Face checkpoint \texttt{cardiffnlp/\allowbreak twitter-\allowbreak roberta-\allowbreak base-\allowbreak sentiment-\allowbreak latest}.} a RoBERTa-base pretrained on a multi-year Twitter corpus and fine-tuned on the TweetEval sentiment benchmark, reaches 0.794~macro-F1 and is the best configuration we tested. Both gains come almost entirely from the pretraining domain rather than from any architectural advantage over DistilBERT.
 \end{sloppypar}
 
 \subsection{Zero-Shot Pretrained Classification}
@@ -616,7 +620,7 @@ Maximum sequence length    & 128               & 128               & 128 \\
 \end{table}
 
 \subsection*{A.4\quad Per-fold cross-validation scores}
-Table~\ref{tab:cv_app} reports the per-fold macro-F1 scores that produce the means and standard deviations in Table~3 of the body, for the three configurations whose pairwise differences are statistically significant (Section~6.5).
+Table~\ref{tab:cv_app} reports the per-fold macro-F1 scores for the three configurations whose pairwise differences are statistically significant (Section~6.5). Twitter-RoBERTa and TF-IDF rows are recomputed with the cached embeddings and \texttt{src/models.py} factories; for FinBERT only the aggregate values are listed, since the pooling used to produce the original embedding cache no longer reproduces exactly.
 
 \begin{table}[!htbp]
 \centering
@@ -625,12 +629,12 @@ Table~\ref{tab:cv_app} reports the per-fold macro-F1 scores that produce the mea
 \toprule
 \textbf{Configuration} & \textbf{F1} & \textbf{F2} & \textbf{F3} & \textbf{F4} & \textbf{F5} & \textbf{Mean} & \textbf{Std} \\
 \midrule
-Twitter-RoBERTa + XGBoost  & .788 & .793 & .800 & .795 & .793 & \textbf{.794} & .006 \\
-FinBERT + XGBoost          & .777 & .779 & .783 & .777 & .779 & .779          & .003 \\
-TF-IDF + SVM               & .728 & .735 & .755 & .740 & .742 & .740          & .013 \\
+Twitter-RoBERTa + XGBoost  & .788 & .786 & .806 & .788 & .798 & \textbf{.793} & .008 \\
+FinBERT + XGBoost          & ---  & ---  & ---  & ---  & ---  & .779          & .003 \\
+TF-IDF + SVM               & .733 & .731 & .765 & .733 & .746 & .742          & .013 \\
 \bottomrule
 \end{tabular}
-\caption{Per-fold macro-F1 (rounded to three decimals) for the three top-ranked frozen-encoder configurations.}
+\caption{Per-fold macro-F1 (rounded to three decimals) for the three top-ranked frozen-encoder configurations. FinBERT per-fold scores are not listed because the cached embeddings on disk use a different pooling than the one recorded in the results table; only the aggregate mean/std are reproducible from the saved results file.}
 \label{tab:cv_app}
 \end{table}
 
