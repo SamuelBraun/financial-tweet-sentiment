@@ -1,35 +1,36 @@
-# Virtual Environment
+# Virtual environments
 .venv/
+.venv_*/
+venv/
 
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*.so
 
 # Jupyter
 .ipynb_checkpoints/
 
-# Distribution / Packaging
-dist/
-build/
-*.egg-info/
-
-# Environment variables
+# Secrets
 .env
 
-# Claude
-.claude/
-
-# Data (local only, not tracked by git)
+# Data (not redistributed)
 data/
+wikiart/
 
-# Model weights / outputs
+# Model artefacts and caches
+models/
 outputs/models/
-outputs/logs/
+*.keras
+*.h5
+*.npy
 
-# Course materials (local reference only — not part of submission)
-practicals/
-
-# OS
+# OS / editor
 .DS_Store
+.vscode/
+.idea/
+
+# Assistant tooling
+.claude/
+.CLAUDE/
+CLAUDE.md
